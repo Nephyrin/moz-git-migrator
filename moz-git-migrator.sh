@@ -220,10 +220,14 @@ revlist_omit_downstream_branch() {
   fi
 }
 
+# Compare two commits from two sets of SHAs to see if they are identical and
+# represent an identical tree. Compares tree hash, author, commitor, timestamps,
+# as well as that the resultant tree is identical (git diff is empty).
 commits_identical() {
   [ -n "$1" ] && [ -n "$2" ] && \
   [ "$(cmd git log --pretty="format:%T%an%ae%at%cn%ce%ct%s%b" --no-walk $1)" = \
-    "$(cmd git log --pretty="format:%T%an%ae%at%cn%ce%ct%s%b" --no-walk $2)" ]
+    "$(cmd git log --pretty="format:%T%an%ae%at%cn%ce%ct%s%b" --no-walk $2)" ] \
+  && [ -z "$(cmd git diff $1 $2)" ]
 }
 
 ##
