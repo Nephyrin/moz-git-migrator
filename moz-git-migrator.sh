@@ -127,17 +127,7 @@ fi
 eval gitdir=\"\$$OPTIND\"
 
 ##
-## Sanity checks
-##
-
-if [ ! -d "$gitdir/.git" ]; then
-  die "\"$gitdir\" does not appear to be a git repository"
-fi
-
-cd "$gitdir"
-
-##
-## Check & find remotes
+## Git/util functions
 ##
 
 # See comment for REMOTE_COMPARE_NORMALIZE above
@@ -158,6 +148,87 @@ remote_normalize()
   fi
   echo "$url"
 }
+
+# git-branch is a porcelain command, but we really want its --contains
+# optimization
+parse-git-branch() {
+  local IFS;
+  local output;
+  local item;
+  output="$(cmd $@)"
+  IFS=$'\n';
+  output=($output);
+  for item in "${output[@]}"; do
+    item="${item#??}"
+    # Skip branches with pointer annotations
+    [ "$item" != "${item% *}" ] || echo "${item%% *}"
+  done
+}
+
+# Generate our rev-lists with identical options so they can be compared
+revlist() {
+  cmd git rev-list --full-history --topo-order --ancestry-path "$@"
+}
+
+#FIXME old head > new head syncbase length implies fetch needed
+
+# This repeats a rev list, finding the first *parallel* branch to $unwanted and
+# listing from there.
+#
+# This is useful if the new remote has more history than the old remote (which
+# may no longer be being updated). The ancestry path could contain a parallel
+# branch that was merged downstream of the commit we're looking for, appearing
+# first in the flattened ancestry list.
+#
+# Old view:        New View:
+#                  C-> o 7  <---  If 6/5 is the first parent, 3/4 will appear
+#                     / \         last in the graph, messing up our count.
+# A-> o 4      B-> 4 o   o 6 <-A
+#     |              |   |
+#     o 3          3 o   o 5
+#    /                \ /
+#   o 2                o 2
+#   |                  |
+#   o 1                o 1 <-- Root commits
+#
+# We get a revlist and count up from the bottom commit, but the new parallel
+# branch means we end up at B when counting up 4 instead of A. So, when we find
+# a non-matching commit (B), we pass it to this, which finds the next merge (C),
+# then finds the parent that *doesn't* contain B, repeating the listing. At this
+# point A should be at count 4 from the bottom.  If there are nested parallel
+# branches, we may need to repeat the process to find the commit we want.
+revlist_omit_downstream_branch() {
+  local base="$1"
+  local origin="$2"
+  local unwanted="$3"
+  local list=($(revlist --merges $origin ^$unwanted ^$base))
+  local downstream_merge=${list[$((${#list[@]} - 1))]}
+  if ! cmd git merge-base --is-ancestor $unwanted $downstream_merge^; then
+    cmd revlist $base..$downstream_merge^
+  elif ! cmd git merge-base --is-ancestor $unwanted $downstream_merge^2; then
+    cmd revlist $base..$downstream_merge^2
+  fi
+}
+
+commits_identical() {
+  [ -n "$1" ] && [ -n "$2" ] && \
+  [ "$(cmd git log --pretty="format:%T%an%ae%at%cn%ce%ct%s%b" --no-walk $1)" = \
+    "$(cmd git log --pretty="format:%T%an%ae%at%cn%ce%ct%s%b" --no-walk $2)" ]
+}
+
+##
+## Sanity checks
+##
+
+if [ ! -d "$gitdir/.git" ]; then
+  die "\"$gitdir\" does not appear to be a git repository"
+fi
+
+cd "$gitdir"
+
+##
+## Check & find remotes
+##
 
 normalized_new="$(remote_normalize "$REMOTE_NEW")"
 normalized_old="$(remote_normalize "$REMOTE_OLD")"
@@ -243,21 +314,6 @@ fi
 ##
 
 heading Branches
-# git-branch is a porcelain command, but we really want its --contains
-# optimization
-parse-git-branch() {
-  local IFS;
-  local output;
-  local item;
-  output="$(cmd $@)"
-  IFS=$'\n';
-  output=($output);
-  for item in "${output[@]}"; do
-    item="${item#??}"
-    # Skip branches with pointer annotations
-    [ "$item" != "${item% *}" ] || echo "${item%% *}"
-  done
-}
 
 # Build lists of refs
 refs_old=($(eval $(cmd git for-each-ref --shell \
@@ -293,30 +349,6 @@ for ref in "${refs_old[@]}"; do
   done
 done
 vstat "Found ${#refs_common_new[@]} common refs: ${refs_common_new[*]}"
-
-# Ensure a variable named e.g. revlist_remote_origin_esr17 exists, for lazily
-# generating these (expensive) lists
-revlist() {
-  cmd git rev-list --full-history --topo-order --ancestry-path "$@"
-}
-revlist_omit_downstream_branch() {
-  local base="$1"
-  local origin="$2"
-  local unwanted="$3"
-  local list=($(revlist --merges $origin ^$unwanted ^$base))
-  local downstream_merge=${list[$((${#list[@]} - 1))]}
-  if ! cmd git merge-base --is-ancestor $unwanted $downstream_merge^; then
-    cmd revlist $base..$downstream_merge^
-  elif ! cmd git merge-base --is-ancestor $unwanted $downstream_merge^2; then
-    cmd revlist $base..$downstream_merge^2
-  fi
-}
-
-commits_identical() {
-  [ -n "$1" ] && [ -n "$2" ] && \
-  [ "$(cmd git log --pretty="format:%T%an%ae%at%cn%ce%ct%s%b" --no-walk $1)" = \
-    "$(cmd git log --pretty="format:%T%an%ae%at%cn%ce%ct%s%b" --no-walk $2)" ]
-}
 
 stat "Scanning for branches that need rebase. This may take a moment..."
 rebase_branches=($(parse-git-branch git branch --contains $ROOT_OLD))
