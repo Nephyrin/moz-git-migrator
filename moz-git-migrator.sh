@@ -312,10 +312,6 @@ revlist_omit_downstream_branch() {
     cmd revlist $base..$downstream_merge^
   elif ! cmd git merge-base --is-ancestor $unwanted $downstream_merge^2; then
     cmd revlist $base..$downstream_merge^2
-  else
-    :;
-    err Failed to find matching commit
-    # FIXME Give better advice (fetch --all), can this happen?
   fi
 }
 
@@ -346,7 +342,6 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
     done
     if [ -n "$reachable_ref_old" ]; then
       # FIXME more error checking
-      # FIXME --date-order is not infallible, sanity check commits and suggest fetch
       reachable_path_length=$(revlist --count $SYNCBASE_OLD..$rebase_old_base)
       vstat "Reachable path length is $reachable_path_length"
       reachable_path=($(revlist $SYNCBASE_NEW..$reachable_ref_new))
@@ -383,8 +378,6 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
 else
   action "No local branches need rebasing"
 fi
-
-#FIXME skip if no branches to rebase
 
 ##
 ## Create command to delete extra tags
