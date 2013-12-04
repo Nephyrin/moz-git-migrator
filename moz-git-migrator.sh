@@ -36,7 +36,6 @@ SYNCBASE_OLD=00544122728fe5fc2db502823b1068102d1c3acc
 # This is a tag that exists in both remotes, so we can easily check if you need
 # to run git fetch --tags <newremote>. Unset TAGCHECK to disable. #FIXME
 TAGCHECK=RELEASE_BASE_20110811
-TAGCHECK_NEW=451a52c38d00be066fcc8d028ecb49f14757b08a
 TAGCHECK_OLD=cf2c1cb76f8ffb0883876a69548f86905a27077b
 
 ##
@@ -190,52 +189,50 @@ done
 ## See if remote needs to be added
 ##
 
+remote_check_fetch() {
+  local remote="$1"
+  local expected_base="$2"
+  # Check that this remote has a master branch, and that is the expected tree.
+  local root="$(cmd git rev-list remotes/"$remote"/master -- | tail -n 1)"
+  if [ -z "$root" ] || [ "$root" != "$expected_base" ]; then
+    action "Remote $remote does not appear to be up to date, fetch it with:"
+    showcmd "git fetch $remote"
+    needs_fetch=1
+  fi
+}
+
 # FIXME need step to abort if old SHAs aren't present
 if [ -z "$remote_old" ]; then
   needs_remote=1
   action "You don't currently have the old mozilla repository as a remote."
   action "The script needs this to generate rebase commands for your local"
   action "branches, temporarily add the old remote with:"
-  showcmd "git remote add old-shas $REMOTE_OLD"
+  showcmd "git remote add mozilla-old $REMOTE_OLD"
+else
+  remote_check_fetch "$remote_old" "$ROOT_OLD"
 fi
+
 if [ -z "$remote_new" ]; then
   needs_remote=1
   action "You don't currently have the new gecko-dev repo configured as a"
   action "remote. Add the new remote with:"
   showcmd "git remote add gecko-dev $REMOTE_NEW"
   showcmd "git fetch gecko-dev"
+else
+  remote_check_fetch "$remote_new" "$ROOT_NEW"
 fi
+
 if [ -z "$remote_projects" ]; then
   needs_remote=1
   action "You don't currently have the new gecko-projects repo configured as a"
   action "remote. Add the new remote with:"
   showcmd "git remote add gecko-projects $REMOTE_PROJECTS"
   showcmd "git fetch gecko-projects"
+else
+  remote_check_fetch "$remote_projects" "$ROOT_PROJECTS"
 fi
 
-##
-## See if remote is fetched, or needs tags-fetch
-##
-
-# FIXME merge with above for stat() reasons
-# FIXME if a branch is longer than any remote on the ancestry path
-
-check_remote() {
-  local remote="$1"
-  local expected_base="$2"
-  # Check that this remote has a master branch, and that is the expected tree.
-  local root="$(cmd git rev-list remotes/"$remote"/master -- | tail -n 1)"
-  if [ -z "$root" ] || [ "$root" != "$expected_base" ]; then
-    action "Remote $remote does not have up to date tree data..." #FIXME
-    needs_fetch=1
-  fi
-}
-
-#FIXME check tags
-[ -z "$remote_new" ] || check_remote "$remote_new" "$ROOT_NEW"
-[ -z "$remote_projects" ] || check_remote "$remote_projects" "$ROOT_PROJECTS"
-
-## Exit if either of the new remotes hasn't been properly added or fetched
+## Exit if any remotes hasn't been properly added or fetched
 if [ -n "$needs_fetch$needs_remote" ]; then
   action "Add and fetch the remotes listed above, then re-run this script"
   exit 1
