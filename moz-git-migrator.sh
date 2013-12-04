@@ -54,13 +54,23 @@ sh_c()
 }
 
 # Print things
-heading() {
-  echo >&2 "$(sh_c 34 1)###$(sh_c)"
-  echo >&2 "$(sh_c 34 1)###$(sh_c) $(sh_c 32 2)$*$(sh_c)"
-  echo >&2 "$(sh_c 34 1)###$(sh_c)"
+heading() { echo >&2 "$(sh_c 34 1)##$(sh_c) $(sh_c 36 2)$*$(sh_c)"; }
+exit_needswork() {
+  heading Result
+  action "Address the issues above and then RERUN THIS SCRIPT to ensure" \
+         "your repository is properly migrated."
+  exit 1
 }
-action() { echo >&2 "$(sh_c 33 1)>>$(sh_c) $*"; }
-showcmd() { echo >&2 "$(sh_c 32 1)#$(sh_c)  $*"; }
+pad() { echo >&2 ""; }
+# indent 2
+action() {
+  action_shown=1
+  echo >&2 "  $(sh_c 33 1)>>$(sh_c) $*";
+}
+# indent 2
+allgood() { echo >&2 "  $(sh_c 32 1)>>$(sh_c) $*"; }
+# indent 4 (shown under actions)
+showcmd() { echo >&2 "     $(sh_c 33 1)\$$(sh_c) $(sh_c 33 2)$*$(sh_c)"; }
 stat() { echo >&2 "$(sh_c 34 1)::$(sh_c) $*"; }
 warn() { echo >&2 "$(sh_c 33 1);;$(sh_c) $*"; }
 err() { echo >&2 "$(sh_c 31 1)!!$(sh_c) $*"; }
@@ -235,7 +245,7 @@ normalized_old="$(remote_normalize "$REMOTE_OLD")"
 normalized_projects="$(remote_normalize "$REMOTE_PROJECTS")"
 
 # TODO better "you're all good" messages
-heading Remotes
+heading Checking Remotes
 remotes=($(cmd git remote))
 for remote in "${remotes[@]}"; do
   # You can have a unconfigured remote, if you really want to.
@@ -304,16 +314,14 @@ else
 fi
 
 ## Exit if any remotes hasn't been properly added or fetched
-if [ -n "$needs_fetch$needs_remote" ]; then
-  action "Add and fetch the remotes listed above, then re-run this script"
-  exit 1
-fi
+[ -z "$needs_fetch$needs_remote" ] || exit_needswork
 
 ##
 ## Create rebase commands for all local branches
 ##
 
-heading Branches
+pad
+heading Checking Branches
 
 # Build lists of refs
 refs_old=($(eval $(cmd git for-each-ref --shell \
@@ -389,15 +397,21 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
         fi
       done
       if [ -n "$rebase_new_base" ]; then
-        action "Branch $rebase_branch is based on $reachable_ref_old, rebase it to $reachable_ref_new with:"
-        showcmd "git checkout $rebase_branch && git rebase $reachable_ref_old --onto $rebase_new_base"
+        pad
+        action "Branch $rebase_branch is based on the old SHAs, rebase it to" \
+               "its equivilent base commit on the new SHAs with:"
+        showcmd "git checkout $rebase_branch"
+        showcmd "git rebase ${rebase_old_base:0:12}" \
+                "--onto ${rebase_new_base:0:12}"
       else
+        pad
         err "Failed to find matching commit in the new repositories for"
         err "branch $rebase_branch! This shouldn't happen :( Please try:"
         showcmd "git fetch $remote_old -p && git fetch $remote_new -p"
         err "And try again. If you still encounter this error, please make sure"
         err "You have the latest version of this script and file an issue at:"
         err "https://github.com/Nephyrin/moz-git-migrator/issues"
+        pad
       fi
     else
       err "Branch $rebase_branch isn't reachable from any common branch..."
@@ -405,18 +419,20 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
     fi
   done
 else
-  action "No local branches need rebasing"
+  allgood "You don't appear to have any remaining branches on the old SHAs"
 fi
 
 ##
 ## Create command to delete extra tags
 ##
 
-heading Tags
+pad
+heading Checking Tags
 
 ## See if tags have been fetched from the new remote or not
 tagcheck_rev="$(cmd git show-ref -s $TAGCHECK || true)"
 if [ "$tagcheck_rev" != "$TAGCHECK_NEW" ]; then
+  pad
   action "Your repository's tags are pointing at the old remote. Update them"
   action "explicitly from the new remote with:"
   showcmd "git fetch --tags $remote_new"
@@ -426,26 +442,40 @@ fi
 # FIXME replacement fetching
 old_tags=$(cmd git tag --contains $ROOT_OLD)
 if [ -z "$old_tags" ]; then
-  action "No old tags need deleting"
+  allgood "Your tags appear to be up to date and using the new SHAs"
 else
+  pad
   action "You have old tags that don't exist in the new SHAs. Verify that you"
   action "Don't want them, then delete them with:"
-  showcmd git tag -d $old_tags
+  showcmd git tag -d \`git tag --contains ${ROOT_OLD:0:12}\`
 fi
+
+## At this point, exit if actions have been shown during branch/tag checking
+[ -z "$action_shown" ] || exit_needswork
 
 ##
 ## Final remote cleanup commands
 ##
 
-heading Cleanup
+pad
+heading Remaining Cleanup
 # TODO only show this if everything else passes, otherwise give advice to re-run
 # showcmd git remote rm $remote_old
 stat "TODO"
 
 ##
-## GC Warning + config
+## Result
 ##
 
-heading Warning about GC
+# If we haven't bailed by now, we're all good!
+pad
+heading Result
+allgood "Your repository appears to be free of non-reflog references to" \
+        "the old SHAs, you're all good!"
+
+pad
+heading Important Note About GC
 # TODO insert warning about GC config option, or steps to resolve in future
 stat "TODO"
+
+exit 0
