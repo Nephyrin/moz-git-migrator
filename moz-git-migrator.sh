@@ -368,8 +368,12 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
         action "Branch $rebase_branch is based on $reachable_ref_old, rebase it to $reachable_ref_new with:"
         showcmd "git checkout $rebase_branch && git rebase $reachable_ref_old --onto $rebase_new_base"
       else
-        # FIXME better error and advice
-        err "Failed to find matching commit"
+        err "Failed to find matching commit in the new repositories for"
+        err "branch $rebase_branch! This shouldn't happen :( Please try:"
+        showcmd "git fetch $remote_old -p && git fetch $remote_new -p"
+        err "And try again. If you still encounter this error, please make sure"
+        err "You have the latest version of this script and file an issue at:"
+        err "https://github.com/Nephyrin/moz-git-migrator/issues"
       fi
     else
       err "Branch $rebase_branch isn't reachable from any common branch..."
