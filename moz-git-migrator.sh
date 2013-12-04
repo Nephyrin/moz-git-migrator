@@ -381,6 +381,16 @@ fi
 ##
 
 heading Tags
+
+## See if tags have been fetched from the new remote or not
+tagcheck_rev="$(cmd git show-ref -s $TAGCHECK || true)"
+if [ "$tagcheck_rev" != "$TAGCHECK_NEW" ]; then
+  action "Your repository's tags are pointing at the old remote. Update them"
+  action "explicitly from the new remote with:"
+  showcmd "git fetch --tags $remote_new"
+  showcmd "git fetch --tags $remote_projects"
+fi
+
 # FIXME replacement fetching
 old_tags=$(cmd git tag --contains $ROOT_OLD)
 if [ -z "$old_tags" ]; then
