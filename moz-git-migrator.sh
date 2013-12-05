@@ -484,15 +484,64 @@ stat "TODO: Advise removing the old remote if you don't need/want it"
 
 # If we haven't bailed by now, we're all good!
 pad
+heading
 heading Result
-allgood "Your repository appears to be free of non-reflog references to" \
-        "the old SHAs, you're all good!"
-
+heading
+allgood
+allgood "Your repository appears to be free of non-reflog references to"
+allgood "the old SHAs, you're all good -- But please take note of the caveats"
+allgood "below!"
+allgood
 pad
-heading Important Note About GC
-# TODO insert warning about GC config option, or steps to resolve in future
-stat "TODO"
 
+
+err "Important Note About Reflogs:"
+action "For branches moved to the new SHAs, your reflogs still contain"
+action "references to the old, pre-rebase SHAs. Keep in mind that recalling"
+action "these old commits into a branch means you'll re-contaminate the branch."
+action "(You may re-run this script at any time to re-check for branches on the"
+action "old SHAs)"
 pad
+
+
+# Check if we're going to run into GC issues with the loose objects
+pruneexpire="$(cmd git config gc.pruneexpire || true)"
+if [ "$pruneexpire" != "now" ]; then
+  err Important Note About GC
+  # TODO insert warning about GC config option, or steps to resolve in future
+  action "Due to the way git handles stale, unreachable objects, you may run"
+  action "into issues once references to the old SHAs have expired from your"
+  action "reflogs. Specifically, your repository may (temporarily) grow as"
+  action "large as 10GiB as the loose references are moved out of packs, and"
+  action "git will begin complaining that you have too many loose objects."
+  pad
+  action "There are three options for dealing with this:"
+  action
+  action "1. Wipe your reflogs of the old SHAs now, and then prune all old"
+  action "   objects immediately"
+  action "   WARNING: This will irrecovably remove all reflog entries that"
+  action "             occured before moving to the new branches!"
+  showcmd "git reflog expire --all --expire-unreachable=all"
+  showcmd "# This will take several minutes, as it is deleting ~1.5 million"
+  showcmd "# commits"
+  showcmd "git gc --prune=now"
+  action
+  action "2. Disable the grace period for unreachable objects for this"
+  action "   repository. Normally, once a reference drops from your reflogs,"
+  action "   git keeps it around, unpacked(!), for a while, just in case."
+  action "   Setting this removes that grace period. If you have no idea how or"
+  action "   why you'd go about finding a unreachable commit that's expired"
+  action "   from your reflogs, this is probably the easiest option"
+  showcmd "git config gc.pruneExpire now"
+  action
+  action "3. Wait until this happens, and git starts complaining about"
+  action "   'too many unreachable objects'. At that point follow its advice"
+  action "   and run git prune as instructed. This is the best option if you"
+  action "   have 10GiB to spare and think you'll remember this instruction in"
+  action "   two months!"
+  showcmd "git prune"
+
+  pad
+fi
 
 exit 0
