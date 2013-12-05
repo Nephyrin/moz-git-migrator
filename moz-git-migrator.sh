@@ -240,6 +240,14 @@ fi
 
 cd "$gitdir"
 
+# Bail early if the old SHAs aren't present
+if ! cmd git show $ROOT_OLD &>/dev/null; then
+  heading Result
+  allgood "This repository does not contain the old SHAs, no action necessary"
+  pad
+  exit 0
+fi
+
 ##
 ## Check & find remotes
 ##
