@@ -56,9 +56,11 @@ sh_c()
 # Print things
 heading() { echo >&2 "$(sh_c 34 1)##$(sh_c) $(sh_c 36 2)$*$(sh_c)"; }
 exit_needswork() {
+  pad
   heading Result
   action "Address the issues above and then RERUN THIS SCRIPT to ensure" \
          "your repository is properly migrated."
+  pad
   exit 1
 }
 pad() { echo >&2 ""; }
@@ -489,5 +491,7 @@ pad
 heading Important Note About GC
 # TODO insert warning about GC config option, or steps to resolve in future
 stat "TODO"
+
+pad
 
 exit 0
