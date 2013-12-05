@@ -184,6 +184,53 @@ revlist() {
   cmd git rev-list --full-history --topo-order --ancestry-path "$@"
 }
 
+# Given a ref, returns ($oldbase $newbase) suitable for e.g.
+#   $ git rebase $oldbase --onto $newbase
+# Expects refs_* have been filled
+find_rebase_point() {
+  local branch="$1"
+  local reachable_ref_old reachable_ref_new
+  local reachable_path reachable_path_length
+  local reachable_ref_offset=0
+
+  local rebase_old_base="$(cmd git merge-base $branch "${refs_old[@]}")"
+  vstat "Base in old SHAs for branch $branch is $rebase_old_base"
+  for ref in "${refs_common_old[@]}"; do
+    if cmd git merge-base --is-ancestor $rebase_old_base $ref; then
+      vstat "Found reachable: $ref"
+      reachable_ref_old="$ref"
+      reachable_ref_new="${refs_common_new[$reachable_ref_offset]}"
+      break
+    fi
+    (( ++reachable_ref_offset ))
+  done
+  if [ -n "$reachable_ref_old" ]; then
+    # FIXME more error checking
+    local reachable_path_length=$(revlist --count $SYNCBASE_OLD..$rebase_old_base)
+    local reachable_path=($(revlist $SYNCBASE_NEW..$reachable_ref_new))
+    local candidate
+    vstat "Reachable path length is $reachable_path_length"
+    while true; do
+      # FIXME bail if lengths don't match
+      if [ "${#reachable_path[@]}" -lt "$reachable_path_length" ]; then
+        vstat "New reachable path is less than desired length, bailing"
+        break
+      fi
+      candidate=${reachable_path[$((${#reachable_path[@]} - $reachable_path_length))]}
+      if commits_identical $candidate $rebase_old_base; then
+        echo "$rebase_old_base" "$candidate"
+        return
+      else
+        vstat "Commits not identical, attempting to find parallel commit"
+        reachable_path=($(revlist_omit_downstream_branch $SYNCBASE_NEW $reachable_ref_new $candidate))
+      fi
+    done
+  else
+    err "Branch $rebase_branch isn't reachable from any common branch..."
+    #FIXME This can happen if $rebase_old_base is on a branch not in the new SHAs. We can fix it!
+  fi
+}
+
 #FIXME old head > new head syncbase length implies fetch needed
 
 # This repeats a rev list, finding the first *parallel* branch to $unwanted and
@@ -380,47 +427,16 @@ rebase_branches=($(parse-git-branch git branch --contains $ROOT_OLD))
 if [ "${#rebase_branches[@]}" -gt 0 ]; then
   stat "${#rebase_branches[@]} branches need rebasing."
   for rebase_branch in "${rebase_branches[@]}"; do
-    unset reachable_ref_old
-    unset reachable_ref_new
-    unset rebase_new_base
-    rebase_old_base=$(cmd git merge-base $rebase_branch "${refs_old[@]}")
-    vstat "Base in old SHAs for branch $rebase_branch is $rebase_old_base"
-    reachable_ref_offset=0
-    for ref in "${refs_common_old[@]}"; do
-      if cmd git merge-base --is-ancestor $rebase_old_base $ref; then
-        vstat "Found reachable: $ref"
-        reachable_ref_old="$ref"
-        reachable_ref_new="${refs_common_new[$reachable_ref_offset]}"
-        break
-      fi
-      (( ++reachable_ref_offset ))
-    done
-    if [ -n "$reachable_ref_old" ]; then
-      # FIXME more error checking
-      reachable_path_length=$(revlist --count $SYNCBASE_OLD..$rebase_old_base)
-      vstat "Reachable path length is $reachable_path_length"
-      reachable_path=($(revlist $SYNCBASE_NEW..$reachable_ref_new))
-      while [ -z "$rebase_new_base" ] && [ -n "$reachable_path" ]; do
-        # FIXME bail if lengths don't match
-        if [ "${#reachable_path[@]}" -lt "$reachable_path_length" ]; then
-          vstat "New reachable path is less than desired length, bailing"
-          break
-        fi
-        candidate=${reachable_path[$((${#reachable_path[@]} - $reachable_path_length))]}
-        if commits_identical $candidate $rebase_old_base; then
-          rebase_new_base="$candidate"
-        else
-          vstat "Commits not identical, attempting to find parallel commit"
-          reachable_path=($(revlist_omit_downstream_branch $SYNCBASE_NEW $reachable_ref_new $candidate))
-        fi
-      done
-      if [ -n "$rebase_new_base" ]; then
+    rebase_point=($(find_rebase_point "$rebase_branch"))
+      if [ -n "$rebase_point" ]; then
+        rebase_old_base="${rebase_point[0]:0:12}"
+        rebase_new_base="${rebase_point[1]:0:12}"
         pad
         action "Branch $rebase_branch is based on the old SHAs, rebase it to" \
                "its equivalent base commit on the new SHAs with:"
         showcmd "git checkout $rebase_branch"
-        showcmd "git rebase ${rebase_old_base:0:12}" \
-                "--onto ${rebase_new_base:0:12}"
+        showcmd "git rebase $rebase_old_base" \
+                "--onto $rebase_new_base"
       else
         pad
         err "Failed to find matching commit in the new repositories for"
@@ -431,10 +447,6 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
         err "https://github.com/Nephyrin/moz-git-migrator/issues"
         pad
       fi
-    else
-      err "Branch $rebase_branch isn't reachable from any common branch..."
-      #FIXME This can happen if $rebase_old_base is on a branch not in the new SHAs. We can fix it!
-    fi
   done
 else
   allgood "You don't appear to have any remaining branches on the old SHAs"
