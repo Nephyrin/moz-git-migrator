@@ -380,7 +380,9 @@ rebase_branches=($(parse-git-branch git branch --contains $ROOT_OLD))
 if [ "${#rebase_branches[@]}" -gt 0 ]; then
   stat "${#rebase_branches[@]} branches need rebasing."
   for rebase_branch in "${rebase_branches[@]}"; do
-    unset reachable_ref
+    unset reachable_ref_old
+    unset reachable_ref_new
+    unset rebase_new_base
     rebase_old_base=$(cmd git merge-base $rebase_branch "${refs_old[@]}")
     vstat "Base in old SHAs for branch $rebase_branch is $rebase_old_base"
     reachable_ref_offset=0
