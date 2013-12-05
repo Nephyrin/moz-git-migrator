@@ -149,6 +149,8 @@ remote_normalize()
   if [ -n "$REMOTE_COMPARE_NORMALIZE" ]; then
     if [ "$url" != "${url#https://}" ]; then
       url="${url#https://}"
+    elif [ "$url" != "${url#http://}" ]; then
+      url="${url#http://}"
     elif [ "$url" != "${url#git://}" ]; then
       url="${url#git://}"
     elif [ "$url" != "${url#*@}" ]; then
