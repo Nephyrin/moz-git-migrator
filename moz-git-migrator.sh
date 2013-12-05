@@ -417,7 +417,7 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
       if [ -n "$rebase_new_base" ]; then
         pad
         action "Branch $rebase_branch is based on the old SHAs, rebase it to" \
-               "its equivilent base commit on the new SHAs with:"
+               "its equivalent base commit on the new SHAs with:"
         showcmd "git checkout $rebase_branch"
         showcmd "git rebase ${rebase_old_base:0:12}" \
                 "--onto ${rebase_new_base:0:12}"
@@ -465,7 +465,7 @@ else
   pad
   action "You have old tags that don't exist in the new SHAs. Verify that you"
   action "Don't want them, then delete them with the command below"
-  actoin "NOTE: The old SHAs had a *lot* more tags, don't panic when this"
+  action "NOTE: The old SHAs had a *lot* more tags, don't panic when this"
   action "      removes 100 tags!"
   showcmd git tag -d \`git tag --contains ${ROOT_OLD:0:12}\`
 fi
@@ -523,8 +523,8 @@ if [ "$pruneexpire" != "now" ]; then
   action
   action "1. Wipe your reflogs of the old SHAs now, and then prune all old"
   action "   objects immediately"
-  action "   WARNING: This will irrecovably remove all reflog entries that"
-  action "             occured before moving to the new branches!"
+  action "   WARNING: This will irrevocably remove all reflog entries that"
+  action "            occurred before moving to the new branches!"
   showcmd "git reflog expire --all --expire-unreachable=all"
   showcmd "# This will take several minutes, as it is deleting ~1.5 million"
   showcmd "# commits"
