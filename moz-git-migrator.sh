@@ -36,7 +36,7 @@ SYNCBASE_OLD=00544122728fe5fc2db502823b1068102d1c3acc
 # This is a tag that exists in both remotes, so we can easily check if you need
 # to run git fetch --tags <newremote>. Unset TAGCHECK to disable. #FIXME
 TAGCHECK=RELEASE_BASE_20110811
-TAGCHECK_OLD=cf2c1cb76f8ffb0883876a69548f86905a27077b
+TAGCHECK_NEW=451a52c38d00be066fcc8d028ecb49f14757b08a
 
 ##
 ## Util
@@ -451,16 +451,18 @@ if [ "$tagcheck_rev" != "$TAGCHECK_NEW" ]; then
   action "explicitly from the new remote with:"
   showcmd "git fetch --tags $remote_new"
   showcmd "git fetch --tags $remote_projects"
+  # Don't show final steps until these are taken care of
 fi
 
-# FIXME replacement fetching
 old_tags=$(cmd git tag --contains $ROOT_OLD)
 if [ -z "$old_tags" ]; then
   allgood "Your tags appear to be up to date and using the new SHAs"
 else
   pad
   action "You have old tags that don't exist in the new SHAs. Verify that you"
-  action "Don't want them, then delete them with:"
+  action "Don't want them, then delete them with the command below"
+  actoin "NOTE: The old SHAs had a *lot* more tags, don't panic when this"
+  action "      removes 100 tags!"
   showcmd git tag -d \`git tag --contains ${ROOT_OLD:0:12}\`
 fi
 
@@ -473,9 +475,8 @@ fi
 
 pad
 heading Remaining Cleanup
-# TODO only show this if everything else passes, otherwise give advice to re-run
-# showcmd git remote rm $remote_old
-stat "TODO"
+# TODO We need to detect if tags/branches exist *before* fetching remotes
+stat "TODO: Advise removing the old remote if you don't need/want it"
 
 ##
 ## Result
