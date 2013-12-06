@@ -386,7 +386,6 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
       showcmd "git checkout $rebase_branch"
       showcmd "git rebase $rebase_old_base" \
         "--onto $rebase_new_base"
-      cmd git log --oneline --no-walk "$rebase_old_base" "$rebase_new_base"
     else
       pad
       err "Failed to find matching commit in the new repositories for"
