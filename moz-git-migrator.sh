@@ -468,10 +468,13 @@ if [ -z "$old_tags" ]; then
 else
   pad
   action "You have old tags that don't exist in the new SHAs. Verify that you"
-  action "Don't want them, then delete them with the command below"
-  action "NOTE: The old SHAs had a *lot* more tags, don't panic when this"
-  action "      removes 100 tags!"
+  action "Don't want them, then delete them with the commands below"
+  action "To list old tags that will be deleted:"
+  showcmd "git tag --contains ${ROOT_OLD:0:12}"
+  action "To delete them:"
   showcmd git tag -d \`git tag --contains ${ROOT_OLD:0:12}\`
+  action "NOTE: There are a *lot* fewer tags on the new remote, so it is normal"
+  action "      for this to show hundreds of tags needing deletion"
 fi
 
 ## At this point, exit if actions have been shown during branch/tag checking
