@@ -38,6 +38,9 @@ SYNCBASE_OLD=00544122728fe5fc2db502823b1068102d1c3acc
 TAGCHECK=RELEASE_BASE_20110811
 TAGCHECK_NEW=451a52c38d00be066fcc8d028ecb49f14757b08a
 
+# Format used to narrow search for matching commits
+COMMIT_MATCH_FORMAT="%T%ct%at"
+
 ##
 ## Util
 ##
@@ -179,14 +182,9 @@ parse-git-branch() {
   done
 }
 
-# Generate our rev-lists with identical options so they can be compared
-revlist() {
-  cmd git rev-list --full-history --topo-order --ancestry-path "$@"
-}
-
 # Given a ref, returns ($oldbase $newbase) suitable for e.g.
 #   $ git rebase $oldbase --onto $newbase
-# Expects refs_* have been filled
+# Expects refs_old and treehashes_new have been filled
 find_rebase_point() {
   local branch="$1"
   local reachable_ref_old reachable_ref_new
@@ -195,90 +193,35 @@ find_rebase_point() {
 
   local rebase_old_base="$(cmd git merge-base $branch "${refs_old[@]}")"
   vstat "Base in old SHAs for branch $branch is $rebase_old_base"
-  for ref in "${refs_common_old[@]}"; do
-    if cmd git merge-base --is-ancestor $rebase_old_base $ref; then
-      vstat "Found reachable: $ref"
-      reachable_ref_old="$ref"
-      reachable_ref_new="${refs_common_new[$reachable_ref_offset]}"
-      break
+
+  local sig="$(git log --no-walk --format="format:$COMMIT_MATCH_FORMAT" \
+                       "$rebase_old_base")"
+  local candidate
+  local i=0
+  # treehashes is a list of pairs (treehash matchingcommit)
+  while [ "$i" -lt $(( ${#treehashes_new[@]} - 1 )) ]; do
+    candidate=${treehashes_new[$(($i + 1))]}
+    if [ "${treehashes_new[$i]}" = "$sig" ] && \
+       commits_identical $rebase_old_base $candidate; then
+      echo $rebase_old_base $candidate
+      return
     fi
-    (( ++reachable_ref_offset ))
+    (( i += 2 ))
   done
-  if [ -n "$reachable_ref_old" ]; then
-    # FIXME more error checking
-    local reachable_path_length=$(revlist --count $SYNCBASE_OLD..$rebase_old_base)
-    local reachable_path=($(revlist $SYNCBASE_NEW..$reachable_ref_new))
-    local candidate
-    vstat "Reachable path length is $reachable_path_length"
-    while true; do
-      # FIXME bail if lengths don't match
-      if [ "${#reachable_path[@]}" -lt "$reachable_path_length" ]; then
-        vstat "New reachable path is less than desired length, bailing"
-        break
-      fi
-      candidate=${reachable_path[$((${#reachable_path[@]} - $reachable_path_length))]}
-      if commits_identical $candidate $rebase_old_base; then
-        echo "$rebase_old_base" "$candidate"
-        return
-      else
-        vstat "Commits not identical, attempting to find parallel commit"
-        reachable_path=($(revlist_omit_downstream_branch $SYNCBASE_NEW $reachable_ref_new $candidate))
-      fi
-    done
-  else
-    err "Branch $rebase_branch isn't reachable from any common branch..."
-    #FIXME This can happen if $rebase_old_base is on a branch not in the new SHAs. We can fix it!
-  fi
 }
 
 #FIXME old head > new head syncbase length implies fetch needed
 
-# This repeats a rev list, finding the first *parallel* branch to $unwanted and
-# listing from there.
-#
-# This is useful if the new remote has more history than the old remote (which
-# may no longer be being updated). The ancestry path could contain a parallel
-# branch that was merged downstream of the commit we're looking for, appearing
-# first in the flattened ancestry list.
-#
-# Old view:        New View:
-#                  C-> o 7  <---  If 6/5 is the first parent, 3/4 will appear
-#                     / \         last in the graph, messing up our count.
-# A-> o 4      B-> 4 o   o 6 <-A
-#     |              |   |
-#     o 3          3 o   o 5
-#    /                \ /
-#   o 2                o 2
-#   |                  |
-#   o 1                o 1 <-- Root commits
-#
-# We get a revlist and count up from the bottom commit, but the new parallel
-# branch means we end up at B when counting up 4 instead of A. So, when we find
-# a non-matching commit (B), we pass it to this, which finds the next merge (C),
-# then finds the parent that *doesn't* contain B, repeating the listing. At this
-# point A should be at count 4 from the bottom.  If there are nested parallel
-# branches, we may need to repeat the process to find the commit we want.
-revlist_omit_downstream_branch() {
-  local base="$1"
-  local origin="$2"
-  local unwanted="$3"
-  local list=($(revlist --merges $origin ^$unwanted ^$base))
-  local downstream_merge=${list[$((${#list[@]} - 1))]}
-  if ! cmd git merge-base --is-ancestor $unwanted $downstream_merge^; then
-    cmd revlist $base..$downstream_merge^
-  elif ! cmd git merge-base --is-ancestor $unwanted $downstream_merge^2; then
-    cmd revlist $base..$downstream_merge^2
-  fi
-}
-
-# Compare two commits from two sets of SHAs to see if they are identical and
-# represent an identical tree. Compares tree hash, author, commitor, timestamps,
-# as well as that the resultant tree is identical (git diff is empty).
+# Compare two commits from two sets of SHAs to see if they are the same
+# re-written commit tree from SYNCBASE upwards
 commits_identical() {
-  [ -n "$1" ] && [ -n "$2" ] && \
-  [ "$(cmd git log --pretty="format:%T%an%ae%at%cn%ce%ct%s%b" --no-walk $1)" = \
-    "$(cmd git log --pretty="format:%T%an%ae%at%cn%ce%ct%s%b" --no-walk $2)" ] \
-  && [ -z "$(cmd git diff $1 $2)" ]
+  local old="$1"
+  local new="$2"
+  vstat "Comparing commits $old and $new"
+  [ -n "$old" ] && [ -n "$new" ] && [ -z "$(cmd git diff $old $new)" ] &&
+  [ "$(cmd git log --format=format:$COMMIT_MATCH_FORMAT $SYNCBASE_OLD..$old)" \
+    = \
+    "$(cmd git log --format=format:$COMMIT_MATCH_FORMAT $SYNCBASE_NEW..$new)" ]
 }
 
 ##
@@ -426,6 +369,12 @@ rebase_branches=($(parse-git-branch git branch --contains $ROOT_OLD))
 
 if [ "${#rebase_branches[@]}" -gt 0 ]; then
   stat "${#rebase_branches[@]} branches need rebasing."
+  stat "Building tree hash graph of new SHAs..."
+  # Array will be pairs of (matchformat hash)
+  treehashes_new=($(git log --format="format:$COMMIT_MATCH_FORMAT %H" \
+                            "${refs_new[@]}" "${refs_projects[@]}" \
+                            ^$SYNCBASE_NEW))
+  vstat "${#treehashes_new[@]} new SHAs in graph"
   for rebase_branch in "${rebase_branches[@]}"; do
     rebase_point=($(find_rebase_point "$rebase_branch"))
     if [ -n "$rebase_point" ]; then
