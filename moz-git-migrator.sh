@@ -428,25 +428,26 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
   stat "${#rebase_branches[@]} branches need rebasing."
   for rebase_branch in "${rebase_branches[@]}"; do
     rebase_point=($(find_rebase_point "$rebase_branch"))
-      if [ -n "$rebase_point" ]; then
-        rebase_old_base="${rebase_point[0]:0:12}"
-        rebase_new_base="${rebase_point[1]:0:12}"
-        pad
-        action "Branch $rebase_branch is based on the old SHAs, rebase it to" \
-               "its equivalent base commit on the new SHAs with:"
-        showcmd "git checkout $rebase_branch"
-        showcmd "git rebase $rebase_old_base" \
-                "--onto $rebase_new_base"
-      else
-        pad
-        err "Failed to find matching commit in the new repositories for"
-        err "branch $rebase_branch! This shouldn't happen :( Please try:"
-        showcmd "git fetch $remote_old -p && git fetch $remote_new -p"
-        err "And try again. If you still encounter this error, please make sure"
-        err "You have the latest version of this script and file an issue at:"
-        err "https://github.com/Nephyrin/moz-git-migrator/issues"
-        pad
-      fi
+    if [ -n "$rebase_point" ]; then
+      rebase_old_base="${rebase_point[0]:0:12}"
+      rebase_new_base="${rebase_point[1]:0:12}"
+      pad
+      action "Branch $rebase_branch is based on the old SHAs, rebase it to its"
+      action "equivalent base commit on the new SHAs with:"
+      showcmd "git checkout $rebase_branch"
+      showcmd "git rebase $rebase_old_base" \
+        "--onto $rebase_new_base"
+      cmd git log --oneline --no-walk "$rebase_old_base" "$rebase_new_base"
+    else
+      pad
+      err "Failed to find matching commit in the new repositories for"
+      err "branch $rebase_branch! This shouldn't happen :( Please try:"
+      showcmd "git fetch $remote_old -p && git fetch $remote_new -p"
+      err "And try again. If you still encounter this error, please make sure"
+      err "You have the latest version of this script and file an issue at:"
+      err "https://github.com/Nephyrin/moz-git-migrator/issues"
+      pad
+    fi
   done
 else
   allgood "You don't appear to have any remaining branches on the old SHAs"
