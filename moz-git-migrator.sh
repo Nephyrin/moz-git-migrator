@@ -385,6 +385,34 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
       showcmd "git checkout $rebase_branch"
       showcmd "git rebase $rebase_old_base" \
         "--onto $rebase_new_base"
+
+      # Check if we need to update tracking
+      upstream_remote="$(cmd git config branch.$rebase_branch.remote || true)"
+      upstream_merge="$(cmd git config branch.$rebase_branch.merge || true)"
+      upstream_merge="${upstream_merge#refs/heads/}"
+      if [ -n "$upstream_remote" ] && [ -n "$upstream_merge" ] &&
+         [ "$(remote_root "$upstream_remote")" = "$ROOT_OLD" ]; then
+        match=""
+        vstat "Looking for $upstream_remote -> $upstream_merge in new refs"
+        for ref in "${refs_new[@]}" "${refs_projects[@]}"; do
+          if [ "${ref#remotes/*/}" = "$upstream_merge" ]; then
+            match="${ref#remotes/}"
+            break
+          fi
+        done
+        if [ -n "$match" ]; then
+          showcmd "git branch --set-upstream-to=$match"
+        else
+          # This is expected, e.g. the branch is tracking your github clone with
+          # old SHAs.
+          action "This branch is tracking $upstream_remote/$upstream_merge,"
+          action "which is based on old SHAs -- but branch $upstream_merge does"
+          action "not exist in $remote_projects or $remote_new. You will need"
+          action "to choose an equivalent upstream in a new remote and set it"
+          action "with --set-upstream-to, e.g. to track $remote_new/master:"
+          showcmd "git branch --set-upstream-to=$remote_new/master"
+        fi
+      fi
     else
       pad
       err "Failed to find matching commit in the new repositories for"
