@@ -145,6 +145,23 @@ eval gitdir=\"\$$OPTIND\"
 ## Git/util functions
 ##
 
+# Find what root commit a remote's master branch is using, with caching
+remote_root()
+{
+  local remote="$1"
+  local varname="remote_root_${remote//[^a-zA-Z]/_}"
+  local root
+  eval root=\$$varname
+  if [ -z "$root" ]; then
+    root="$(git rev-list "$remote"/master 2>/dev/null | tail -n 1)"
+  fi
+  # Some mirrors have 'central' as the main branch
+  if [ -z "$root" ]; then
+    root="$(git rev-list "$remote"/central 2>/dev/null | tail -n 1)"
+  fi
+  echo "$root"
+}
+
 # See comment for REMOTE_COMPARE_NORMALIZE above
 remote_normalize()
 {
@@ -234,12 +251,24 @@ fi
 
 cd "$gitdir"
 
+heading "Checking Repository"
 # Bail early if the old SHAs aren't present
 if ! cmd git show $ROOT_OLD &>/dev/null; then
   heading Result
   allgood "This repository does not contain the old SHAs, no action necessary"
   pad
   exit 0
+fi
+
+stat "Scanning tags"
+old_tags="$(cmd git tag --contains $ROOT_OLD)"
+stat "Scanning branches"
+rebase_branches=($(parse-git-branch git branch --contains $ROOT_OLD))
+
+if [ "${#rebase_branches[@]}" -gt 0 ]; then
+  # We need to fetch/add the old remote to properly find the merge point of old
+  # branches
+  want_old_remote=1
 fi
 
 ##
@@ -251,6 +280,8 @@ normalized_old="$(remote_normalize "$REMOTE_OLD")"
 normalized_projects="$(remote_normalize "$REMOTE_PROJECTS")"
 
 # TODO better "you're all good" messages
+
+pad
 heading Checking Remotes
 remotes=($(cmd git remote))
 for remote in "${remotes[@]}"; do
@@ -268,7 +299,16 @@ for remote in "${remotes[@]}"; do
     remote_projects="$remote"
     stat "remote $remote -> gecko-projects (New SHAs)"
   else
-    stat "remote $remote is not recognized"
+    remote_root="$(remote_root "$remote")"
+    if [ "$remote_root" = "$ROOT_OLD" ]; then
+      stat "remote $remote -> Unknown Old SHAs repo"
+    elif [ "$remote_root" = "$ROOT_NEW" ]; then
+      stat "remote $remote -> Unknown New SHAs repo (gecko-dev based)"
+    elif [ "$remote_root" = "$ROOT_PROJECTS" ]; then
+      stat "remote $remote -> Unknown New SHAs repo (gecko-projects based)"
+    else
+      stat "remote $remote is not recognized"
+    fi
   fi
 done
 
@@ -280,7 +320,7 @@ remote_check_fetch() {
   local remote="$1"
   local expected_base="$2"
   # Check that this remote has a master branch, and that is the expected tree.
-  local root="$(cmd git rev-list remotes/"$remote"/master -- | tail -n 1)"
+  local root="$(remote_root $remote)"
   if [ -z "$root" ] || [ "$root" != "$expected_base" ]; then
     action "Remote $remote does not appear to be up to date, fetch it with:"
     showcmd "git fetch $remote"
@@ -288,7 +328,7 @@ remote_check_fetch() {
   fi
 }
 
-if [ -z "$remote_old" ]; then
+if [ -z "$remote_old" ] && [ -n "$want_old_remote" ]; then
   needs_remote=1
   action "You don't currently have the old mozilla repository as a remote."
   action "The script needs this to generate rebase commands for your local"
@@ -325,49 +365,26 @@ fi
 ## Create rebase commands for all local branches
 ##
 
-pad
-heading Checking Branches
-
-# Build lists of refs
-refs_old=($(eval $(cmd git for-each-ref --shell \
-                                        --format \
-                                        'r=%(refname);echo "${r#refs/}";' \
-                                        refs/remotes/$remote_old/)))
-refs_new=($(eval $(cmd git for-each-ref --shell \
-                                        --format \
-                                        'r=%(refname);echo "${r#refs/}";' \
-                                        refs/remotes/$remote_new/)))
-refs_projects=($(eval $(cmd git for-each-ref --shell \
-                                             --format \
-                                             'r=%(refname);echo "${r#refs/}";' \
-                                             refs/remotes/$remote_projects/)))
-
-refs_allnew=("${refs_new[@]}" "${refs_projects[@]}")
-
-stat Finding common refs
-# Find all remote branches held in both sets
-refs_common_old=()
-refs_common_new=()
-refs_common_projects=()
-for ref in "${refs_old[@]}"; do
-  ref="${ref#remotes/$remote_old/}"
-  for match in "${refs_new[@]}" "${refs_projects[@]}"; do
-    if [ "remotes/$remote_new/$ref" = "$match" ]; then
-      refs_common_new[${#refs_common_new[@]}]="remotes/$remote_new/$ref"
-      refs_common_old[${#refs_common_old[@]}]="remotes/$remote_old/$ref"
-    elif [ "remotes/$remote_projects/$ref" = "$match" ]; then
-      refs_common_new[${#refs_common_new[@]}]="remotes/$remote_projects/$ref"
-      refs_common_old[${#refs_common_old[@]}]="remotes/$remote_old/$ref"
-    fi
-  done
-done
-vstat "Found ${#refs_common_new[@]} common refs: ${refs_common_new[*]}"
-
-stat "Scanning for branches that need rebase. This may take a moment..."
-rebase_branches=($(parse-git-branch git branch --contains $ROOT_OLD))
-
 if [ "${#rebase_branches[@]}" -gt 0 ]; then
+  pad
+  heading Rebase Old Branches
+
   stat "${#rebase_branches[@]} branches need rebasing."
+  stat "Building list of refs..."
+  # Build lists of refs
+  refs_old=($(eval $(cmd git for-each-ref --shell \
+                                          --format \
+                                          'r=%(refname);echo "${r#refs/}";' \
+                                          refs/remotes/$remote_old/)))
+  refs_new=($(eval $(cmd git for-each-ref --shell \
+                                          --format \
+                                          'r=%(refname);echo "${r#refs/}";' \
+                                          refs/remotes/$remote_new/)))
+  refs_projects=($(eval $(cmd git for-each-ref --shell \
+                                               --format \
+                                               'r=%(refname);echo "${r#refs/}";' \
+                                               refs/remotes/$remote_projects/)))
+
   stat "Building tree hash graph of new SHAs..."
   # Array will be pairs of (matchformat hash)
   treehashes_new=($(git log --format="format:$COMMIT_MATCH_FORMAT %H" \
@@ -446,7 +463,6 @@ if [ "$tagcheck_rev" != "$TAGCHECK_NEW" ]; then
   # Don't show final steps until these are taken care of
 fi
 
-old_tags=$(cmd git tag --contains $ROOT_OLD)
 if [ -z "$old_tags" ]; then
   allgood "Your tags appear to be up to date and using the new SHAs"
 else
