@@ -50,7 +50,7 @@ sh_c()
   [ ! -z "$c" ] || c=0
   [ ! -z "$b" ] || [ $c -eq 0 ] || b=0
   [ -z "$b" ] || b="$b;"
-  echo -n -e "\e[$b${c}m"
+  echo -n -e "\033[$b${c}m"
 }
 
 # Print things
