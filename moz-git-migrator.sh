@@ -6,7 +6,6 @@ set -e
 ## Config
 ##
 
-#FIXME warn on remote-not-found that you can edit these
 # The new SHAs
 REMOTE_NEW=https://github.com/mozilla/gecko-dev
 # The old SHAs
@@ -227,8 +226,6 @@ find_rebase_point() {
   done
 }
 
-#FIXME old head > new head syncbase length implies fetch needed
-
 # Compare two commits from two sets of SHAs to see if they are the same
 # re-written commit tree from SYNCBASE upwards
 commits_identical() {
@@ -278,8 +275,6 @@ fi
 normalized_new="$(remote_normalize "$REMOTE_NEW")"
 normalized_old="$(remote_normalize "$REMOTE_OLD")"
 normalized_projects="$(remote_normalize "$REMOTE_PROJECTS")"
-
-# TODO better "you're all good" messages
 
 pad
 heading Checking Remotes
@@ -486,7 +481,6 @@ fi
 
 pad
 heading Remaining Cleanup
-# TODO We need to detect if tags/branches exist *before* fetching remotes
 stat "TODO: Advise removing the old remote if you don't need/want it"
 
 ##
@@ -519,7 +513,6 @@ pad
 pruneexpire="$(cmd git config gc.pruneexpire || true)"
 if [ "$pruneexpire" != "now" ]; then
   err Important Note About GC
-  # TODO insert warning about GC config option, or steps to resolve in future
   action "Due to the way git handles stale, unreachable objects, you may run"
   action "into issues once references to the old SHAs have expired from your"
   action "reflogs. Specifically, your repository may (temporarily) grow as"
