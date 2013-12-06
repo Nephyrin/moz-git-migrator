@@ -20,7 +20,7 @@ REMOTE_PROJECTS=https://github.com/mozilla/gecko-projects
 # non-github remote, set to 0
 REMOTE_COMPARE_NORMALIZE=1
 
-# The root commits for the trees we're aware of. FIXME needed with syncbase?
+# The root commits for the trees we're aware of.
 ROOT_NEW=3b56a9af51519d2e77e05efa672a13e6be2e9ebc
 ROOT_OLD=781c48087175615674b38b31fcc0aae17f0651b6
 ROOT_PROJECTS=fbf6b2c8fb285414ff412f2088b368efbf3172ed
@@ -34,7 +34,7 @@ SYNCBASE_NEW=f6626f2142251f2b410205eed77278c5ae01a567
 SYNCBASE_OLD=00544122728fe5fc2db502823b1068102d1c3acc
 
 # This is a tag that exists in both remotes, so we can easily check if you need
-# to run git fetch --tags <newremote>. Unset TAGCHECK to disable. #FIXME
+# to run git fetch --tags <newremote>. Unset TAGCHECK to disable.
 TAGCHECK=RELEASE_BASE_20110811
 TAGCHECK_NEW=451a52c38d00be066fcc8d028ecb49f14757b08a
 
@@ -61,8 +61,8 @@ heading() { echo >&2 "$(sh_c 34 1)##$(sh_c) $(sh_c 36 2)$*$(sh_c)"; }
 exit_needswork() {
   pad
   heading Result
-  action "Address the issues above and then RERUN THIS SCRIPT to ensure" \
-         "your repository is properly migrated."
+  action "Address the issues above and then RERUN THIS SCRIPT to ensure that"
+  action "your repository is properly migrated."
   pad
   exit 1
 }
@@ -288,7 +288,6 @@ remote_check_fetch() {
   fi
 }
 
-# FIXME need step to abort if old SHAs aren't present
 if [ -z "$remote_old" ]; then
   needs_remote=1
   action "You don't currently have the old mozilla repository as a remote."
