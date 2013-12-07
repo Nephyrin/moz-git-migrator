@@ -249,6 +249,11 @@ fi
 cd "$gitdir"
 
 heading "Checking Repository"
+if [ -n "$(cmd git status -s -uno)" ]; then
+  err "Warning: Repository has uncommited changes, you should commit or stash"
+  err "         these before running the commands below"
+fi
+
 if ! cmd git show $ROOT_OLD &>/dev/null; then
   # Repository doesn't even have the old SHAs
   no_old_shas=1
