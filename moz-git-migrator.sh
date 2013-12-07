@@ -56,7 +56,7 @@ sh_c()
 }
 
 # Print things
-heading() { echo >&2 "$(sh_c 34 1)##$(sh_c) $(sh_c 36 2)$*$(sh_c)"; }
+heading() { echo >&2 "$(sh_c 34 1)>>$(sh_c) $(sh_c 36 2)$*$(sh_c)"; }
 exit_needswork() {
   pad
   heading Result
@@ -69,12 +69,12 @@ pad() { echo >&2 ""; }
 # indent 2
 action() {
   action_shown=1
-  echo >&2 "  $(sh_c 33 1)>>$(sh_c) $*";
+  echo >&2 "  $(sh_c 33 1)##$(sh_c) $*";
 }
 # indent 2
-allgood() { echo >&2 "  $(sh_c 32 1)>>$(sh_c) $*"; }
+allgood() { echo >&2 "  $(sh_c 32 1)##$(sh_c) $*"; }
 # indent 4 (shown under actions)
-showcmd() { echo >&2 "     $(sh_c 33 1)\$$(sh_c) $(sh_c 33 2)$*$(sh_c)"; }
+showcmd() { echo >&2 "     $(sh_c 33 1):;$(sh_c) $(sh_c 33 2)$*$(sh_c)"; }
 stat() { echo >&2 "$(sh_c 34 1)::$(sh_c) $*"; }
 warn() { echo >&2 "$(sh_c 33 1);;$(sh_c) $*"; }
 err() { echo >&2 "$(sh_c 31 1)!!$(sh_c) $*"; }
