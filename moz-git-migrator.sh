@@ -249,18 +249,16 @@ fi
 cd "$gitdir"
 
 heading "Checking Repository"
-# Bail early if the old SHAs aren't present
 if ! cmd git show $ROOT_OLD &>/dev/null; then
-  heading Result
-  allgood "This repository does not contain the old SHAs, no action necessary"
-  pad
-  exit 0
+  # Repository doesn't even have the old SHAs
+  no_old_shas=1
+  stat "Old SHAs not present"
+else
+  stat "Scanning tags"
+  old_tags="$(cmd git tag --contains $ROOT_OLD)"
+  stat "Scanning branches"
+  rebase_branches=($(parse-git-branch git branch --contains $ROOT_OLD))
 fi
-
-stat "Scanning tags"
-old_tags="$(cmd git tag --contains $ROOT_OLD)"
-stat "Scanning branches"
-rebase_branches=($(parse-git-branch git branch --contains $ROOT_OLD))
 
 if [ "${#rebase_branches[@]}" -gt 0 ]; then
   # We need to fetch/add the old remote to properly find the merge point of old
@@ -279,6 +277,7 @@ normalized_projects="$(remote_normalize "$REMOTE_PROJECTS")"
 pad
 heading Checking Remotes
 remotes=($(cmd git remote))
+old_remotes=()
 for remote in "${remotes[@]}"; do
   # You can have a unconfigured remote, if you really want to.
   url="$(cmd git config remote.$remote.url || true)"
@@ -289,6 +288,7 @@ for remote in "${remotes[@]}"; do
     stat "remote $remote -> gecko-dev (New SHAs)"
   elif [ "$url" = "$normalized_old" ]; then
     remote_old="$remote"
+    old_remotes[${#old_remotes[@]}]="$remote"
     stat "remote $remote -> mozilla-central (Old SHAs)"
   elif [ "$url" = "$normalized_projects" ]; then
     remote_projects="$remote"
@@ -297,6 +297,7 @@ for remote in "${remotes[@]}"; do
     remote_root="$(remote_root "$remote")"
     if [ "$remote_root" = "$ROOT_OLD" ]; then
       stat "remote $remote -> Unknown Old SHAs repo"
+      old_remotes[${#old_remotes[@]}]="$remote"
     elif [ "$remote_root" = "$ROOT_NEW" ]; then
       stat "remote $remote -> Unknown New SHAs repo (gecko-dev based)"
     elif [ "$remote_root" = "$ROOT_PROJECTS" ]; then
@@ -479,28 +480,36 @@ fi
 ## Final remote cleanup commands
 ##
 
-pad
-heading Remaining Cleanup
-stat "TODO: Advise removing the old remote if you don't need/want it"
+if [ "${#old_remotes[@]}" -gt 0 ]; then
+  pad
+  heading Remove Old Remotes
+  action "No branches or tags remain using the old SHAs, but old remotes still"
+  action "exist. Remove them with:"
+  for remote in "${old_remotes[@]}"; do
+    showcmd "git remote rm $remote"
+  done
+  exit_needswork
 
 ##
-## Result
+## All good, final warnings
 ##
 
-# If we haven't bailed by now, we're all good!
 pad
-heading
 heading Result
-heading
-allgood
-allgood "Your repository appears to be free of non-reflog references to"
-allgood "the old SHAs, you're all good -- But please take note of the caveats"
-allgood "below!"
-allgood
+
+if [ -z "$no_old_shas" ]; then
+  allgood "The old SHAs are not present in this repository. You're all good!"
+  exit 0;
+fi
+
+# Otherwise, we're all done, but need to warn about the reflog/GC issues with
+# still having old SHAs around
+
+allgood "No branches, tags, or remotes using old SHAs remain, but please pay"
+allgood "attention to the important caveats below"
+
 pad
-
-
-err "Important Note About Reflogs:"
+heading "Warning About Old Reflogs"
 action "For branches moved to the new SHAs, your reflogs still contain"
 action "references to the old, pre-rebase SHAs. Keep in mind that recalling"
 action "these old commits into a branch means you'll re-contaminate the branch."
