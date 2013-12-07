@@ -521,38 +521,27 @@ pad
 # Check if we're going to run into GC issues with the loose objects
 pruneexpire="$(cmd git config gc.pruneexpire || true)"
 if [ "$pruneexpire" != "now" ]; then
-  err Important Note About GC
-  action "Due to the way git handles stale, unreachable objects, you may run"
-  action "into issues once references to the old SHAs have expired from your"
-  action "reflogs. Specifically, your repository may (temporarily) grow as"
-  action "large as 10GiB as the loose references are moved out of packs, and"
-  action "git will begin complaining that you have too many loose objects."
-  pad
-  action "There are three options for dealing with this:"
+  heading Important Note About GC
+  action "Git evicts unreachable objects from packs for a grace period, before"
+  action "deleting them. This mechanism does not expect you to have 1.5 million"
+  action "obsolete objects. This means that when git attempts to evict the old"
+  action "SHAs, it will grow your repository to ~10GiB, and then complain that"
+  action "there are too many unreachable objects"
   action
-  action "1. Wipe your reflogs of the old SHAs now, and then prune all old"
-  action "   objects immediately"
-  action "   WARNING: This will irrevocably remove all reflog entries that"
-  action "            occurred before moving to the new branches!"
-  showcmd "git reflog expire --all --expire-unreachable=all"
-  showcmd "# This will take several minutes, as it is deleting ~1.5 million"
-  showcmd "# commits"
-  showcmd "git gc --prune=now"
+  action "There are two ways of dealing with this:"
   action
-  action "2. Disable the grace period for unreachable objects for this"
-  action "   repository. Normally, once a reference drops from your reflogs,"
-  action "   git keeps it around, unpacked(!), for a while, just in case."
-  action "   Setting this removes that grace period. If you have no idea how or"
-  action "   why you'd go about finding a unreachable commit that's expired"
-  action "   from your reflogs, this is probably the easiest option"
+  action "1. If your repository growing to 10GiB would be very bad, you can"
+  action "   prevent this by disabling said grace period for this repository"
+  action "   only. If you have no idea how or why you would go about finding"
+  action "   an unreachable commit that has expired from your reflogs, this is"
+  action "   the easiest option."
   showcmd "git config gc.pruneExpire now"
   action
-  action "3. Wait until this happens, and git starts complaining about"
-  action "   'too many unreachable objects'. At that point follow its advice"
-  action "   and run git prune as instructed. This is the best option if you"
-  action "   have 10GiB to spare and think you'll remember this instruction in"
-  action "   two months!"
-  showcmd "git prune"
+  action "2. Do nothing. Git will start complaining about 'too many unreachable"
+  action "   objects' when the objects expire, and recommend you delete them"
+  action "   |git prune|. Take its advice, and you will be all good."
+  action "   This is the best option if you have 10GiB to spare and will"
+  action "   remember this instruction in two months."
 
   pad
 fi
