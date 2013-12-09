@@ -210,19 +210,19 @@ find_rebase_point() {
   local rebase_old_base="$(git merge-base $branch "${refs_all_old[@]}")"
   vstat "Base in old SHAs for branch $branch is $rebase_old_base"
 
-  local sig="$(git log --no-walk --format="format:$COMMIT_MATCH_FORMAT" \
-                       "$rebase_old_base")"
+  local sig="$(cmd git log --no-walk --format="format:$COMMIT_MATCH_FORMAT" \
+                           "$rebase_old_base")"
+  vstat "Looking for treehash $sig"
   local candidate
   local i=0
-  # treehashes is a list of pairs (treehash matchingcommit)
-  while [ "$i" -lt $(( ${#treehashes_new[@]} - 1 )) ]; do
-    candidate=${treehashes_new[$(($i + 1))]}
-    if [ "${treehashes_new[$i]}" = "$sig" ] && \
-       commits_identical $rebase_old_base $candidate; then
+  # treehashes is a list of pairs (treehash:matchingcommit)
+  for candidate in $(echo "$treehashes_new" | egrep "^$sig"); do
+    candidate="${candidate#*:}"
+    vstat "Considering commit $candidate"
+    if commits_identical $rebase_old_base $candidate; then
       echo $rebase_old_base $candidate
       return
     fi
-    (( i += 2 ))
   done
 }
 
@@ -398,11 +398,11 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
 
   stat "Building tree hash graph of new SHAs..."
   # Array will be pairs of (matchformat hash)
-  treehashes_new=($(git log --format="format:$COMMIT_MATCH_FORMAT %H" \
+  treehashes_new=("$(cmd git log --format="format:$COMMIT_MATCH_FORMAT:%H" \
                             "${refs_new[@]}" "${refs_projects[@]}" \
-                            ^$SYNCBASE_NEW))
-  vstat "${#treehashes_new[@]} new SHAs in graph"
+                            ^$SYNCBASE_NEW)")
   for rebase_branch in "${rebase_branches[@]}"; do
+    stat "Finding rebase point for branch $rebase_branch"
     rebase_point=($(find_rebase_point "$rebase_branch"))
     if [ -n "$rebase_point" ]; then
       rebase_old_base="${rebase_point[0]:0:12}"
