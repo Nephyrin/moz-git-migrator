@@ -69,7 +69,7 @@ pad() { echo >&2 ""; }
 # indent 2
 action() {
   action_shown=1
-  echo >&2 "  $(sh_c 33 1)##$(sh_c) $*";
+  echo >&2 "  $(sh_c 33 1)##$(sh_c) $*"
 }
 # highlight commit
 hlc() {
@@ -81,7 +81,7 @@ allgood() { echo >&2 "  $(sh_c 32 1)##$(sh_c) $*"; }
 # indent 4 (shown under actions)
 showcmd() { echo >&2 "     $(sh_c 33 1):;$(sh_c) $*"; }
 stat() { echo >&2 "$(sh_c 34 1)::$(sh_c) $*"; }
-warn() { echo >&2 "$(sh_c 33 1);;$(sh_c) $*"; }
+warn() { echo >&2 "  $(sh_c 31 1)##$(sh_c) $*"; }
 err() { echo >&2 "$(sh_c 31 1)!!$(sh_c) $*"; }
 vstat() {
   [ -z "$verbose" ] || echo >&2 "$(sh_c 30 1)--$(sh_c 37 0) $*$(sh_c)"
@@ -405,7 +405,21 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
     vstat "Base in old SHAs for branch $rebase_branch is $rebase_old_base"
     rebase_new_base=($(cmd find_rebase_point "$rebase_branch" "$rebase_old_base"))
     if [ -n "$rebase_old_base" ] && [ -n "$rebase_new_base" ]; then
-      # Check upstream
+      pad
+      action "Branch $rebase_branch is based on the old SHAs, rebase it to its"
+      action "equivalent base commit on the new SHAs with:"
+      showcmd "git checkout $rebase_branch"
+      showcmd "git rebase -i $(hlc $rebase_old_base) --onto" \
+              "$(hlc $rebase_new_base)"
+
+      # Warn about merges
+      if [ -n "$(cmd git rev-list --merges \
+                         $rebase_branch ^$rebase_old_base)" ]; then
+        warn "This branch contains merges, rebasing might not be without"
+        warn "conflicts. If you run into issues, try rebasing this branch on"
+        warn "its current upstream to eliminate merges before migrating it"
+      fi
+      # Check upstream and tracking
       upstream_remote="$(cmd git config branch.$rebase_branch.remote || true)"
       upstream_merge="$(cmd git config branch.$rebase_branch.merge || true)"
       upstream_merge="${upstream_merge#refs/heads/}"
@@ -417,57 +431,47 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
         fi
         expected_base="$(cmd git merge-base "$rebase_branch" "$upstream")"
         if [ "$expected_base" != "$rebase_old_base" ]; then
-          err "WARNING: This branch is based on commit $(hlc $expected_base) in"
-          err "branch $upstream, but its nearest base in the mozilla-central"
-          err "remote is $(hlc $rebase_old_base). This can happen if $upstream"
-          err "is not an upstream branch, or if your $remote_old remote is out"
-          err "of date and needs to be fetched."
-          err "Double-check that the rebase command below is doing what you"
-          err "expect!"
+          warn "WARNING: This branch is based on commit $(hlc $expected_base)"
+          warn "in branch $upstream, but its nearest base in the $remote_old"
+          warn "remote is $(hlc $rebase_old_base). This can happen if $upstream"
+          warn "is not an upstream branch, or if '$remote_old' is out of date"
+          warn "and needs to be fetched. Double-check that the rebase command"
+          warn "above is doing what you expect!"
         fi
-      fi
-      pad
-      action "Branch $rebase_branch is based on the old SHAs, rebase it to its"
-      action "equivalent base commit on the new SHAs with:"
-      showcmd "git checkout $rebase_branch"
-      showcmd "git rebase $rebase_old_base" \
-        "--onto $rebase_new_base"
-
-      # Check if we need to update tracking
-      if [ -n "$upstream_remote" ] && [ -n "$upstream_merge" ] &&
-         [ "$(remote_root "$upstream_remote")" = "$ROOT_OLD" ]; then
-        match=""
-        vstat "Looking for $upstream_remote -> $upstream_merge in new refs"
-        for ref in "${refs_new[@]}" "${refs_projects[@]}"; do
-          if [ "${ref#remotes/*/}" = "$upstream_merge" ]; then
-            match="${ref#remotes/}"
-            break
+        if [ "$(remote_root "$upstream_remote")" = "$ROOT_OLD" ]; then
+          match=""
+          vstat "Looking for $upstream_remote -> $upstream_merge in new refs"
+          for ref in "${refs_new[@]}" "${refs_projects[@]}"; do
+            if [ "${ref#remotes/*/}" = "$upstream_merge" ]; then
+              match="${ref#remotes/}"
+              break
+            fi
+          done
+          if [ -n "$match" ]; then
+            showcmd "git branch --set-upstream-to=$match"
+          else
+            # This is expected, e.g. the branch is tracking your github clone
+            # with old SHAs.
+            action "This branch is tracking $upstream_remote/$upstream_merge,"
+            action "which is based on old SHAs -- but branch $upstream_merge"
+            action "does not exist in $remote_projects or $remote_new. You will"
+            action "need to choose an equivalent upstream in a new remote with"
+            action "--set-upstream-to. e.g. to track $remote_new/master:"
+            showcmd "git branch --set-upstream-to=$remote_new/master"
           fi
-        done
-        if [ -n "$match" ]; then
-          showcmd "git branch --set-upstream-to=$match"
-        else
-          # This is expected, e.g. the branch is tracking your github clone with
-          # old SHAs.
-          action "This branch is tracking $upstream_remote/$upstream_merge,"
-          action "which is based on old SHAs -- but branch $upstream_merge does"
-          action "not exist in $remote_projects or $remote_new. You will need"
-          action "to choose an equivalent upstream in a new remote and set it"
-          action "with --set-upstream-to, e.g. to track $remote_new/master:"
-          showcmd "git branch --set-upstream-to=$remote_new/master"
         fi
       fi
     else
       [ -n "$rebase_old_base" ] || rebase_old_base=UNKNOWN
       pad
-      err "Failed to find rebase point for $rebase_branch. It appears to be"
-      err "based on $rebase_old_base, which doesn't exist in the new remotes."
-      err "This can happen if your view of the new remotes is out of date,"
-      err "please try:"
+      warn "Failed to find rebase point for $rebase_branch. It appears to be"
+      warn "based on $rebase_old_base, which doesn't exist in the new remotes."
+      warn "This can happen if your view of the new remotes is out of date,"
+      warn "please try:"
       showcmd "git fetch $remote_new -p && git fetch $remote_projects -p"
-      err "And try again. If you still encounter this error, make sure that you"
-      err "have the latest version of this script and file an issue at:"
-      err "https://github.com/Nephyrin/moz-git-migrator/issues"
+      warn "And try again. If you still encounter this error, make sure that"
+      warn "you have the latest version of this script and file an issue at:"
+      warn "https://github.com/Nephyrin/moz-git-migrator/issues"
       pad
     fi
   done
@@ -502,7 +506,7 @@ else
   action "To list old tags that will be deleted:"
   showcmd "git tag --contains $(hlc $ROOT_OLD)"
   action "To delete them:"
-  showcmd git tag -d \`git tag --contains $(hlc $ROOT_OLD)\`
+  showcmd "git tag -d \`git tag --contains $(hlc $ROOT_OLD)\`"
   action "NOTE: There are a *lot* fewer tags on the new remote, so it is normal"
   action "      for this to show hundreds of tags needing deletion"
 fi
