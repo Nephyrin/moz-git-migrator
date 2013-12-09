@@ -256,6 +256,19 @@ fi
 
 cd "$gitdir"
 
+## Info and backup warning
+heading "Info and Warning"
+warn "This script will analyze your repository and suggest commands to migrate"
+warn "to the new gecko-dev upstream. This script should not suggest any"
+warn "destructive or irreversible commands, but you should understand what they"
+warn "are doing before running any of them. Stop by #git if you would like"
+warn "further guidance or have any questions!"
+warn
+warn "If in doubt, it is not a bad idea to keep a backup of your repository"
+warn "before proceeding:"
+showcmd "cp -a my-repo/.git my-repo-bak"
+pad
+
 heading "Checking Repository"
 if [ -n "$(cmd git status -s -uno)" ]; then
   err "Warning: Repository has uncommited changes, you should commit or stash"
@@ -400,7 +413,8 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
                             "${refs_new[@]}" "${refs_projects[@]}" \
                             ^$SYNCBASE_NEW)")
   for rebase_branch in "${rebase_branches[@]}"; do
-    vstat "Finding rebase point for branch $rebase_branch"
+    pad
+    heading "Rebase branch $rebase_branch"
     rebase_old_base="$(cmd find_merge_point $rebase_branch)"
     vstat "Base in old SHAs for branch $rebase_branch is $rebase_old_base"
     rebase_new_base=($(cmd find_rebase_point "$rebase_branch" "$rebase_old_base"))
@@ -415,6 +429,7 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
       # Warn about merges
       if [ -n "$(cmd git rev-list --merges \
                          $rebase_branch ^$rebase_old_base)" ]; then
+        pad
         warn "This branch contains merges, rebasing might not be without"
         warn "conflicts. If you run into issues, try rebasing this branch on"
         warn "its current upstream to eliminate merges before migrating it"
@@ -431,6 +446,7 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
         fi
         expected_base="$(cmd git merge-base "$rebase_branch" "$upstream")"
         if [ "$expected_base" != "$rebase_old_base" ]; then
+          pad
           warn "WARNING: This branch is based on commit $(hlc $expected_base)"
           warn "in branch $upstream, but its nearest base in the $remote_old"
           warn "remote is $(hlc $rebase_old_base). This can happen if $upstream"
@@ -452,6 +468,7 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
           else
             # This is expected, e.g. the branch is tracking your github clone
             # with old SHAs.
+            pad
             action "This branch is tracking $upstream_remote/$upstream_merge,"
             action "which is based on old SHAs -- but branch $upstream_merge"
             action "does not exist in $remote_projects or $remote_new. You will"
