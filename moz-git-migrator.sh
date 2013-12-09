@@ -200,14 +200,14 @@ parse-git-branch() {
 
 # Given a ref, returns ($oldbase $newbase) suitable for e.g.
 #   $ git rebase $oldbase --onto $newbase
-# Expects refs_old and treehashes_new have been filled
+# Expects refs_all_old and treehashes_new have been filled
 find_rebase_point() {
   local branch="$1"
   local reachable_ref_old reachable_ref_new
   local reachable_path reachable_path_length
   local reachable_ref_offset=0
 
-  local rebase_old_base="$(cmd git merge-base $branch "${refs_old[@]}")"
+  local rebase_old_base="$(git merge-base $branch "${refs_all_old[@]}")"
   vstat "Base in old SHAs for branch $branch is $rebase_old_base"
 
   local sig="$(git log --no-walk --format="format:$COMMIT_MATCH_FORMAT" \
@@ -373,6 +373,16 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
   stat "${#rebase_branches[@]} branches need rebasing."
   stat "Building list of refs..."
   # Build lists of refs
+  # All refs on old remotes
+  refs_all_old=()
+  for remote in "${old_remotes[@]}"; do
+    refs_all_old=("${refs_all_old[@]}" \
+                  $(eval $(cmd git for-each-ref --shell \
+                                          --format \
+                                          'r=%(refname);echo "${r#refs/}";' \
+                                          refs/remotes/$remote/)))
+  done
+  # Refs on the canonical old remote
   refs_old=($(eval $(cmd git for-each-ref --shell \
                                           --format \
                                           'r=%(refname);echo "${r#refs/}";' \
