@@ -400,6 +400,29 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
     vstat "Base in old SHAs for branch $rebase_branch is $rebase_old_base"
     rebase_new_base=($(cmd find_rebase_point "$rebase_branch" "$rebase_old_base"))
     if [ -n "$rebase_old_base" ] && [ -n "$rebase_new_base" ]; then
+      rebase_old_base="${rebase_old_base:0:12}"
+      rebase_new_base="${rebase_new_base:0:12}"
+      # Check upstream
+      upstream_remote="$(cmd git config branch.$rebase_branch.remote || true)"
+      upstream_merge="$(cmd git config branch.$rebase_branch.merge || true)"
+      upstream_merge="${upstream_merge#refs/heads/}"
+      if [ -n "$upstream_merge" ] && [ -n "$upstream_remote" ]; then
+        if [ "$upstream_remote" = "." ]; then
+          upstream="$upstream_merge"
+        else
+          upstream="remotes/$upstream_remote/$upstream_merge"
+        fi
+        expected_base="$(cmd git merge-base "$rebase_branch" "$upstream")"
+        if [ "$expected_base" != "$rebase_old_base" ]; then
+          err "WARNING: This branch is based on commit ${expected_base:0:12} in"
+          err "branch $upstream, but its nearest base in the mozilla-central"
+          err "remote is ${rebase_old_base:0:12}. This can happen if $upstream"
+          err "is not an upstream branch, or if your $remote_old remote is out"
+          err "of date and needs to be fetched."
+          err "Double-check that the rebase command below is doing what you"
+          err "expect!"
+        fi
+      fi
       pad
       action "Branch $rebase_branch is based on the old SHAs, rebase it to its"
       action "equivalent base commit on the new SHAs with:"
@@ -408,9 +431,6 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
         "--onto $rebase_new_base"
 
       # Check if we need to update tracking
-      upstream_remote="$(cmd git config branch.$rebase_branch.remote || true)"
-      upstream_merge="$(cmd git config branch.$rebase_branch.merge || true)"
-      upstream_merge="${upstream_merge#refs/heads/}"
       if [ -n "$upstream_remote" ] && [ -n "$upstream_merge" ] &&
          [ "$(remote_root "$upstream_remote")" = "$ROOT_OLD" ]; then
         match=""
@@ -435,11 +455,7 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
         fi
       fi
     else
-      if [ -n "$rebase_old_base" ]; then
-        rebase_old_base="${rebase_old_base:0:12}"
-      else
-        rebase_old_base="UNKNOWN"
-      fi
+      [ -n "$rebase_old_base" ] || rebase_old_base=UNKNOWN
       pad
       err "Failed to find rebase point for $rebase_branch. It appears to be"
       err "based on $rebase_old_base, which doesn't exist in the new remotes."
