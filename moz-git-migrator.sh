@@ -199,14 +199,15 @@ parse-git-branch() {
 }
 
 # Find where a branch merges with the old SHAs
+# Expects refs_remote has been filled
 find_merge_point() {
   local branch="$1"
-  echo $(git merge-base $branch "${refs_all_old[@]}")
+  echo $(cmd git merge-base $branch "${refs_old[@]}")
 }
 
 # Given a ref, returns ($oldbase $newbase) suitable for e.g.
 #   $ git rebase $oldbase --onto $newbase
-# Expects refs_all_old and treehashes_new have been filled
+# Expects treehashes_new has been filled
 find_rebase_point() {
   local branch="$1"
   local rebase_old_base="$2"
@@ -223,7 +224,7 @@ find_rebase_point() {
   for candidate in $(echo "$treehashes_new" | egrep "^$sig"); do
     candidate="${candidate#*:}"
     if commits_identical $rebase_old_base $candidate; then
-      echo $rebase_old_base $candidate
+      echo $candidate
       return
     fi
   done
@@ -375,16 +376,6 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
   stat "${#rebase_branches[@]} branches need rebasing."
   stat "Building list of refs..."
   # Build lists of refs
-  # All refs on old remotes
-  refs_all_old=()
-  for remote in "${old_remotes[@]}"; do
-    refs_all_old=("${refs_all_old[@]}" \
-                  $(eval $(cmd git for-each-ref --shell \
-                                          --format \
-                                          'r=%(refname);echo "${r#refs/}";' \
-                                          refs/remotes/$remote/)))
-  done
-  # Refs on the canonical old remote
   refs_old=($(eval $(cmd git for-each-ref --shell \
                                           --format \
                                           'r=%(refname);echo "${r#refs/}";' \
@@ -405,9 +396,9 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
                             ^$SYNCBASE_NEW)")
   for rebase_branch in "${rebase_branches[@]}"; do
     stat "Finding rebase point for branch $rebase_branch"
-    rebase_old_base="$(find_merge_point $branch)"
-    vstat "Base in old SHAs for branch $branch is $rebase_old_base"
-    rebase_new_base=($(find_rebase_point "$rebase_branch"))
+    rebase_old_base="$(cmd find_merge_point $rebase_branch)"
+    vstat "Base in old SHAs for branch $rebase_branch is $rebase_old_base"
+    rebase_new_base=($(cmd find_rebase_point "$rebase_branch" "$rebase_old_base"))
     if [ -n "$rebase_old_base" ] && [ -n "$rebase_new_base" ]; then
       pad
       action "Branch $rebase_branch is based on the old SHAs, rebase it to its"
