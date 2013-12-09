@@ -224,7 +224,7 @@ find_rebase_point() {
     candidate="${candidate#*:}"
     vstat "Considering commit $candidate"
     if commits_identical $rebase_old_base $candidate; then
-      echo $rebase_old_base $candidate
+      echo $candidate
       return
     fi
   done
@@ -375,16 +375,13 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
   heading Rebase Old Branches
 
   stat "${#rebase_branches[@]} branches need rebasing."
-  stat "Building list of refs..."
+  stat "Building list of refs, this may take a minute..."
   # Build lists of refs
-  # All refs on old remotes
+  # All remote refs that contain the old base
   refs_all_old=()
-  for remote in "${old_remotes[@]}"; do
-    refs_all_old=("${refs_all_old[@]}" \
-                  $(eval $(cmd git for-each-ref --shell \
-                                          --format \
-                                          'r=%(refname);echo "${r#refs/}";' \
-                                          refs/remotes/$remote/)))
+  for ref in $(parse-git-branch git branch -r --contains $ROOT_OLD); do
+    vstat "found remote $ref"
+    refs_all_old[${#refs_all_old[@]}]="remotes/$ref"
   done
   # Refs on the canonical old remote
   refs_old=($(eval $(cmd git for-each-ref --shell \
