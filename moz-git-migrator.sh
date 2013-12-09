@@ -198,17 +198,21 @@ parse-git-branch() {
   done
 }
 
+# Find where a branch merges with the old SHAs
+find_merge_point() {
+  local branch="$1"
+  echo $(git merge-base $branch "${refs_all_old[@]}")
+}
+
 # Given a ref, returns ($oldbase $newbase) suitable for e.g.
 #   $ git rebase $oldbase --onto $newbase
 # Expects refs_all_old and treehashes_new have been filled
 find_rebase_point() {
   local branch="$1"
+  local rebase_old_base="$2"
   local reachable_ref_old reachable_ref_new
   local reachable_path reachable_path_length
   local reachable_ref_offset=0
-
-  local rebase_old_base="$(git merge-base $branch "${refs_all_old[@]}")"
-  vstat "Base in old SHAs for branch $branch is $rebase_old_base"
 
   local sig="$(cmd git log --no-walk --format="format:$COMMIT_MATCH_FORMAT" \
                            "$rebase_old_base")"
@@ -403,10 +407,10 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
                             ^$SYNCBASE_NEW)")
   for rebase_branch in "${rebase_branches[@]}"; do
     stat "Finding rebase point for branch $rebase_branch"
-    rebase_point=($(find_rebase_point "$rebase_branch"))
-    if [ -n "$rebase_point" ]; then
-      rebase_old_base="${rebase_point[0]:0:12}"
-      rebase_new_base="${rebase_point[1]:0:12}"
+    local rebase_old_base="$(find_merge_point $branch)"
+    vstat "Base in old SHAs for branch $branch is $rebase_old_base"
+    rebase_new_base=($(find_rebase_point "$rebase_branch"))
+    if [ -n "$rebase_old_base" ] && [ -n "$rebase_new_base" ]; then
       pad
       action "Branch $rebase_branch is based on the old SHAs, rebase it to its"
       action "equivalent base commit on the new SHAs with:"
@@ -442,12 +446,19 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
         fi
       fi
     else
+      if [ -n "$rebase_old_base" ]; then
+        rebase_old_base="${rebase_old_base:0:12}"
+      else
+        rebase_old_base="UNKNOWN"
+      fi
       pad
-      err "Failed to find matching commit in the new repositories for"
-      err "branch $rebase_branch! This shouldn't happen :( Please try:"
-      showcmd "git fetch $remote_old -p && git fetch $remote_new -p"
-      err "And try again. If you still encounter this error, please make sure"
-      err "You have the latest version of this script and file an issue at:"
+      err "Failed to find rebase point for $rebase_branch. It appears to be"
+      err "based on $rebase_old_base, which doesn't exist in the new remotes."
+      err "This can happen if your view of the new remotes is out of date,"
+      err "please try:"
+      showcmd "git fetch $remote_new -p && git fetch $remote_projects -p"
+      err "And try again. If you still encounter this error, make sure that you"
+      err "have the latest version of this script and file an issue at:"
       err "https://github.com/Nephyrin/moz-git-migrator/issues"
       pad
     fi
