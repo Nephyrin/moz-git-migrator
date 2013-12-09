@@ -71,10 +71,15 @@ action() {
   action_shown=1
   echo >&2 "  $(sh_c 33 1)##$(sh_c) $*";
 }
+# highlight commit
+hlc() {
+  local msg="$*"
+  echo -n "$(sh_c 31 0)${msg:0:12}$(sh_c)"
+}
 # indent 2
 allgood() { echo >&2 "  $(sh_c 32 1)##$(sh_c) $*"; }
 # indent 4 (shown under actions)
-showcmd() { echo >&2 "     $(sh_c 33 1):;$(sh_c) $(sh_c 33 2)$*$(sh_c)"; }
+showcmd() { echo >&2 "     $(sh_c 33 1):;$(sh_c) $*"; }
 stat() { echo >&2 "$(sh_c 34 1)::$(sh_c) $*"; }
 warn() { echo >&2 "$(sh_c 33 1);;$(sh_c) $*"; }
 err() { echo >&2 "$(sh_c 31 1)!!$(sh_c) $*"; }
@@ -395,13 +400,11 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
                             "${refs_new[@]}" "${refs_projects[@]}" \
                             ^$SYNCBASE_NEW)")
   for rebase_branch in "${rebase_branches[@]}"; do
-    stat "Finding rebase point for branch $rebase_branch"
+    vstat "Finding rebase point for branch $rebase_branch"
     rebase_old_base="$(cmd find_merge_point $rebase_branch)"
     vstat "Base in old SHAs for branch $rebase_branch is $rebase_old_base"
     rebase_new_base=($(cmd find_rebase_point "$rebase_branch" "$rebase_old_base"))
     if [ -n "$rebase_old_base" ] && [ -n "$rebase_new_base" ]; then
-      rebase_old_base="${rebase_old_base:0:12}"
-      rebase_new_base="${rebase_new_base:0:12}"
       # Check upstream
       upstream_remote="$(cmd git config branch.$rebase_branch.remote || true)"
       upstream_merge="$(cmd git config branch.$rebase_branch.merge || true)"
@@ -414,9 +417,9 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
         fi
         expected_base="$(cmd git merge-base "$rebase_branch" "$upstream")"
         if [ "$expected_base" != "$rebase_old_base" ]; then
-          err "WARNING: This branch is based on commit ${expected_base:0:12} in"
+          err "WARNING: This branch is based on commit $(hlc $expected_base) in"
           err "branch $upstream, but its nearest base in the mozilla-central"
-          err "remote is ${rebase_old_base:0:12}. This can happen if $upstream"
+          err "remote is $(hlc $rebase_old_base). This can happen if $upstream"
           err "is not an upstream branch, or if your $remote_old remote is out"
           err "of date and needs to be fetched."
           err "Double-check that the rebase command below is doing what you"
@@ -497,9 +500,9 @@ else
   action "You have old tags that don't exist in the new SHAs. Verify that you"
   action "Don't want them, then delete them with the commands below"
   action "To list old tags that will be deleted:"
-  showcmd "git tag --contains ${ROOT_OLD:0:12}"
+  showcmd "git tag --contains $(hlc $ROOT_OLD)"
   action "To delete them:"
-  showcmd git tag -d \`git tag --contains ${ROOT_OLD:0:12}\`
+  showcmd git tag -d \`git tag --contains $(hlc $ROOT_OLD)\`
   action "NOTE: There are a *lot* fewer tags on the new remote, so it is normal"
   action "      for this to show hundreds of tags needing deletion"
 fi
