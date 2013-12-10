@@ -385,7 +385,7 @@ if [ -z "$remote_old" ] && [ -n "$want_old_remote" ]; then
   action "The script needs this to generate rebase commands for your local"
   action "branches, temporarily add the old remote with:"
   show_add_remote mozilla-old $REMOTE_OLD $REMOTE_OLD_FAST
-else
+elif [ -n "$remote_old" ]; then
   remote_check_fetch "$remote_old" "$ROOT_OLD"
 fi
 
