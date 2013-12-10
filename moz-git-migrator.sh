@@ -564,9 +564,7 @@ if [ "$tagcheck_rev" != "$TAGCHECK_NEW" ]; then
   showcmd "git fetch --tags $remote_new"
   showcmd "git fetch --tags $remote_projects"
   # Don't show final steps until these are taken care of
-fi
-
-if [ -z "$old_tags" ]; then
+elif [ -z "$old_tags" ]; then
   allgood "Your tags appear to be up to date and using the new SHAs"
 else
   pad
