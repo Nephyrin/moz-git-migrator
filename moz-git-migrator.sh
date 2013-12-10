@@ -415,22 +415,25 @@ fi
 [ -z "$needs_fetch$needs_remote" ] || exit_needswork
 
 ## Sanity check if any branches are out of date
-new_length="$(git rev-list --count $SYNCBASE_NEW..$remote_new/master)"
-old_length="$(git rev-list --count $SYNCBASE_OLD..$remote_old/master)"
-if [ "$old_length" -gt "$new_length" ]; then
-  err "Remote $remote_new has a shorter history than $remote_old. Please fetch"
-  err "all involved remotes before running this script."
-  needs_fetch=1
-else
-  note "All remotes found! However, it is important that all remotes be up to"
-  note "date for this script to find the proper equivalent commits in the new"
-  note "repository. If you have not fetched the involved remotes after doing"
-  note "work on this repository, you should do so now and then re-run this"
-  note "script -- or you may get odd results!"
+# (we might not have decided to fetch remote_old)
+if [ -n "$remote_new" ] && [ -n "$remote_old" ]; then
+  new_length="$(git rev-list --count $SYNCBASE_NEW..$remote_new/master)"
+  old_length="$(git rev-list --count $SYNCBASE_OLD..$remote_old/master)"
+  if [ "$old_length" -gt "$new_length" ]; then
+    err "Remote $remote_new has a shorter history than $remote_old. Please"
+    err "fetch all involved remotes before running this script."
+    needs_fetch=1
+  else
+    note "All remotes found! However, it is important that all remotes be up to"
+    note "date for this script to find the proper equivalent commits in the new"
+    note "repository. If you have not fetched the involved remotes after doing"
+    note "work on this repository, you should do so now and then re-run this"
+    note "script -- or you may get odd results!"
+  fi
+  showcmd "git fetch -p $remote_old"
+  showcmd "git fetch -p $remote_new"
+  showcmd "git fetch -p $remote_projects"
 fi
-showcmd "git fetch -p $remote_old"
-showcmd "git fetch -p $remote_new"
-showcmd "git fetch -p $remote_projects"
 
 [ -z "$needs_fetch" ] || exit_needswork
 
