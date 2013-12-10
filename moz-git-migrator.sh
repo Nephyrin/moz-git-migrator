@@ -70,10 +70,8 @@ exit_needswork() {
 }
 pad() { echo >&2 ""; }
 # indent 2
-action() {
-  action_shown=1
-  echo >&2 "  $(sh_c 33 1)##$(sh_c) $*"
-}
+action() { action_shown=1; note "$*"; }
+note() { echo >&2 "  $(sh_c 33 1)##$(sh_c) $*"; }
 # highlight commit
 hlc() {
   local msg="$*"
@@ -424,11 +422,11 @@ if [ "$old_length" -gt "$new_length" ]; then
   err "all involved remotes before running this script."
   needs_fetch=1
 else
-  action "All remotes found! However, it is important that all remotes be up to"
-  action "date for this script to find the proper equivalent commits in the new"
-  action "repository. If you have not fetched the involved remotes after doing"
-  action "work on this repository, you should do so now and then re-run this"
-  action "script -- or you may get odd results!"
+  note "All remotes found! However, it is important that all remotes be up to"
+  note "date for this script to find the proper equivalent commits in the new"
+  note "repository. If you have not fetched the involved remotes after doing"
+  note "work on this repository, you should do so now and then re-run this"
+  note "script -- or you may get odd results!"
 fi
 showcmd "git fetch -p $remote_old"
 showcmd "git fetch -p $remote_new"
