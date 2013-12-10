@@ -608,8 +608,9 @@ fi
 pad
 heading Result
 
-if [ -z "$no_old_shas" ]; then
-  allgood "The old SHAs are not present in this repository. You're all good!"
+if [ -n "$no_old_shas" ]; then
+  allgood "No branches, tags, or remotes using the old SHAs are present in this"
+  allgood "repository. You're all good!"
   exit 0;
 fi
 
