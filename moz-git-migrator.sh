@@ -382,6 +382,7 @@ show_add_remote() {
 
 if [ -z "$remote_old" ] && [ -n "$want_old_remote" ]; then
   needs_remote=1
+  pad
   action "You don't currently have the old mozilla repository as a remote."
   action "The script needs this to generate rebase commands for your local"
   action "branches, temporarily add the old remote with:"
@@ -401,6 +402,7 @@ fi
 
 if [ -z "$remote_projects" ]; then
   needs_remote=1
+  pad
   action "You don't currently have the new gecko-projects repo configured as a"
   action "remote. Add the new remote with:"
   show_add_remote gecko-projects $REMOTE_PROJECTS $REMOTE_PROJECTS_FAST
