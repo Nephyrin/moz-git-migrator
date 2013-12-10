@@ -411,6 +411,9 @@ else
   remote_check_fetch "$remote_projects" "$ROOT_PROJECTS"
 fi
 
+## Exit if any remotes hasn't been properly added or fetched
+[ -z "$needs_fetch$needs_remote" ] || exit_needswork
+
 ## Sanity check if any branches are out of date
 new_length="$(git rev-list --count $SYNCBASE_NEW..$remote_new/master)"
 old_length="$(git rev-list --count $SYNCBASE_OLD..$remote_old/master)"
@@ -429,8 +432,7 @@ showcmd "git fetch -p $remote_old"
 showcmd "git fetch -p $remote_new"
 showcmd "git fetch -p $remote_projects"
 
-## Exit if any remotes hasn't been properly added or fetched
-[ -z "$needs_fetch$needs_remote" ] || exit_needswork
+[ -z "$needs_fetch" ] || exit_needswork
 
 ##
 ## Create rebase commands for all local branches
