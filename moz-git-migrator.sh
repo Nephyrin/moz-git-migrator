@@ -280,11 +280,12 @@ fi
 cd "$gitdir"
 
 ## Git version check
+which git >/dev/null || die "Failed to find git in your $PATH :("
 gitver="$(git --version 2>/dev/null || true)"
 gitver="${gitver##git version }"
 egitver="${gitver//./ }"
 egitver=($egitver)
-if [ "${egitver[0]}" -lt 1 ] || [ "${egitver[1]}" -lt 8 ]; then
+if [[ "${egitver[0]}" -lt 1 || "${egitver[1]}" -lt 8 ]]; then
   err "This script requires git be at least version 1.8"
   err "Found v$gitver at $(which git)"
   err ":("
