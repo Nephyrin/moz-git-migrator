@@ -43,6 +43,9 @@ TAGCHECK_NEW=451a52c38d00be066fcc8d028ecb49f14757b08a
 # Format used to narrow search for matching commits
 COMMIT_MATCH_FORMAT="%T%ct%at"
 
+# Where to invite user to report errors if one is encountered
+ERROR_REPORT_URL=https://github.com/Nephyrin/moz-git-migrator/issues
+
 ##
 ## Util
 ##
@@ -105,6 +108,15 @@ usage() {
   echo >&2 ""
   echo >&2 "This script will NOT run any command on your repository by itself."
 }
+
+error_exit() {
+  local line
+  [ -z "$1" ] || line=" at line $1"
+  err "Unexpected error${line}, please report this at:"
+  die "$ERROR_REPORT_URL"
+}
+
+trap 'error_exit ${LINENO}' ERR
 
 ##
 ## Parse options
@@ -543,7 +555,7 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
       showcmd "git fetch $remote_new -p && git fetch $remote_projects -p"
       warn "And try again. If you still encounter this error, make sure that"
       warn "you have the latest version of this script and file an issue at:"
-      warn "https://github.com/Nephyrin/moz-git-migrator/issues"
+      warn "$ERROR_REPORT_URL"
       pad
     fi
   done
