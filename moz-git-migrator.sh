@@ -259,7 +259,7 @@ cd "$gitdir"
 
 ## Git version check
 gitver="$(git --version 2>/dev/null || true)"
-gitver="${gitver##* }"
+gitver="${gitver##git version }"
 egitver="${gitver//./ }"
 egitver=($egitver)
 if [ "${egitver[0]}" -lt 1 ] || [ "${egitver[1]}" -lt 8 ]; then
