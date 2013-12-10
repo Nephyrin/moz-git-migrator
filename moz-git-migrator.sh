@@ -579,7 +579,9 @@ else
   action "To delete them:"
   showcmd "git tag -d \`git tag --contains $(hlc $ROOT_OLD)\`"
   action "NOTE: There are a *lot* fewer tags on the new remote, so it is normal"
-  action "      for this to show hundreds of tags needing deletion"
+  action "      for this to show >1000 tags needing deletion. (The new gecko-dev"
+  action "      remote doesn't export the old CVS tags or tags from release"
+  action "      branches)
 fi
 
 ## At this point, exit if actions have been shown during branch/tag checking
