@@ -8,10 +8,13 @@ set -e
 
 # The new SHAs
 REMOTE_NEW=https://github.com/mozilla/gecko-dev
+REMOTE_NEW_FAST=git://github.com/mozilla/gecko-dev
 # The old SHAs
 REMOTE_OLD=https://github.com/mozilla/mozilla-central
+REMOTE_OLD_FAST=git://github.com/mozilla/mozilla-central
 # The projects shas we're adding
 REMOTE_PROJECTS=https://github.com/mozilla/gecko-projects
+REMOTE_PROJECTS_FAST=git://github.com/mozilla/gecko-projects
 
 # If set, try to strip the protocol from remotes to compare them, e.g.
 # foo@github.com:mozilla/bob -> github.com/mozilla/bob, so we match the various
@@ -362,12 +365,27 @@ remote_check_fetch() {
   fi
 }
 
+show_add_remote() {
+  local name="$1"
+  local remote="$2"
+  local remote_fast="$3"
+  showcmd "git remote add $name $remote"
+  showcmd "git fetch $name"
+  action "NOTE: If fetching is slow over https, you can do your initial fetch"
+  action "      via the insecure git:// protocol, then switch back to https:"
+  showcmd "git remote set-url $name $remote_fast"
+  showcmd "git fetch $name"
+  showcmd "git remote set-url $name $remote"
+  showcmd "git fetch $name -p"
+
+}
+
 if [ -z "$remote_old" ] && [ -n "$want_old_remote" ]; then
   needs_remote=1
   action "You don't currently have the old mozilla repository as a remote."
   action "The script needs this to generate rebase commands for your local"
   action "branches, temporarily add the old remote with:"
-  showcmd "git remote add mozilla-old $REMOTE_OLD"
+  show_add_remote mozilla-old $REMOTE_OLD $REMOTE_OLD_FAST
 else
   remote_check_fetch "$remote_old" "$ROOT_OLD"
 fi
@@ -376,8 +394,7 @@ if [ -z "$remote_new" ]; then
   needs_remote=1
   action "You don't currently have the new gecko-dev repo configured as a"
   action "remote. Add the new remote with:"
-  showcmd "git remote add gecko-dev $REMOTE_NEW"
-  showcmd "git fetch gecko-dev"
+  show_add_remote gecko-dev $REMOTE_NEW $REMOTE_NEW_FAST
 else
   remote_check_fetch "$remote_new" "$ROOT_NEW"
 fi
@@ -386,8 +403,7 @@ if [ -z "$remote_projects" ]; then
   needs_remote=1
   action "You don't currently have the new gecko-projects repo configured as a"
   action "remote. Add the new remote with:"
-  showcmd "git remote add gecko-projects $REMOTE_PROJECTS"
-  showcmd "git fetch gecko-projects"
+  show_add_remote gecko-projects $REMOTE_PROJECTS $REMOTE_PROJECTS_FAST
 else
   remote_check_fetch "$remote_projects" "$ROOT_PROJECTS"
 fi
