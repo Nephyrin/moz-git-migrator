@@ -390,6 +390,8 @@ remote_check_fetch() {
   # Check that this remote has a master branch, and that is the expected tree.
   local root="$(remote_root $remote)"
   if [ -z "$root" ] || [ "$root" != "$expected_base" ]; then
+    pad
+    heading "Fetch $remote"
     action "Remote $remote does not appear to be up to date, fetch it with:"
     showcmd "git fetch $remote"
     needs_fetch=1
@@ -414,6 +416,7 @@ show_add_remote() {
 if [ -z "$remote_old" ] && [ -n "$want_old_remote" ]; then
   needs_remote=1
   pad
+  heading "Add mozilla-old remote"
   action "You don't currently have the old mozilla repository as a remote."
   action "The script needs this to generate rebase commands for your local"
   action "branches, temporarily add the old remote with:"
@@ -424,6 +427,8 @@ fi
 
 if [ -z "$remote_new" ]; then
   needs_remote=1
+  pad
+  heading "Add gecko-dev remote"
   action "You don't currently have the new gecko-dev repo configured as a"
   action "remote. Add the new remote with:"
   show_add_remote gecko-dev $REMOTE_NEW $REMOTE_NEW_FAST
@@ -434,6 +439,7 @@ fi
 if [ -z "$remote_projects" ]; then
   needs_remote=1
   pad
+  heading "Add gecko-projects remote"
   action "You don't currently have the new gecko-projects repo configured as a"
   action "remote. Add the new remote with:"
   show_add_remote gecko-projects $REMOTE_PROJECTS $REMOTE_PROJECTS_FAST
