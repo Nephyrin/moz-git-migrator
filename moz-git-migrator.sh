@@ -404,6 +404,9 @@ if [ -z "$remote_projects" ]; then
   action "You don't currently have the new gecko-projects repo configured as a"
   action "remote. Add the new remote with:"
   show_add_remote gecko-projects $REMOTE_PROJECTS $REMOTE_PROJECTS_FAST
+  action "Note: Even if you don't personally need gecko-projects, this script"
+  action "needs to be able to see the gecko-projects heads to work its magic."
+  action "You can remove it after migrating if no branches make use of it."
 else
   remote_check_fetch "$remote_projects" "$ROOT_PROJECTS"
 fi
