@@ -596,6 +596,7 @@ if [ "${#old_remotes[@]}" -gt 0 ]; then
     showcmd "git remote rm $remote"
   done
   exit_needswork
+fi
 
 ##
 ## All good, final warnings
