@@ -463,7 +463,8 @@ if [ "${#rebase_branches[@]}" -gt 0 ]; then
           upstream="remotes/$upstream_remote/$upstream_merge"
         fi
         expected_base="$(cmd git merge-base "$rebase_branch" "$upstream")"
-        if [ "$expected_base" != "$rebase_old_base" ]; then
+        if [ "$expected_base" != "$rebase_old_base" ] && \
+           ! git merge-base --is-ancestor $expected_base $rebase_old_base; then
           pad
           warn "WARNING: This branch is based on commit $(hlc $expected_base)"
           warn "in branch $upstream, but its nearest base in the $remote_old"
