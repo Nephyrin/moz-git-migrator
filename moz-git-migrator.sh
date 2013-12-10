@@ -256,6 +256,18 @@ fi
 
 cd "$gitdir"
 
+## Git version check
+gitver="$(git --version 2>/dev/null || true)"
+gitver="${gitver##* }"
+egitver="${gitver//./ }"
+egitver=($egitver)
+if [ "${egitver[0]}" -lt 1 ] || [ "${egitver[1]}" -lt 8 ]; then
+  err "This script requires git be at least version 1.8"
+  err "Found v$gitver at $(which git)"
+  err ":("
+  exit 1
+fi
+
 ## Info and backup warning
 heading "Info and Warning"
 warn "This script will analyze your repository and suggest commands to migrate"
