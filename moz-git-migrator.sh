@@ -118,6 +118,16 @@ error_exit() {
 
 trap 'error_exit ${LINENO}' ERR
 
+checkgit() {
+  if ! cmd git "$@"; then
+    local code=$?
+    err "Git command:"
+    err "  git $(printf %q "$@")"
+    err "Unexpectedly failed with error $code"
+    error_exit
+  fi
+}
+
 ##
 ## Parse options
 ##
@@ -281,6 +291,16 @@ if [ "${egitver[0]}" -lt 1 ] || [ "${egitver[1]}" -lt 8 ]; then
   exit 1
 fi
 
+# Git hits a stack overflow when doing git tag --contains on our (massive) tree.
+# Happens 100% of the time with 4M stack, and in some configurations at 8M
+# stack, so try to set stack to 16M
+if ! ulimit -s 16384; then
+  err "Due to a bug in git, this script needs to run git with a 16M stack to"
+  err "avoid crashes, however, running |ulimit -s 16384| failed. If you"
+  err "encounter a git crash below, you will need to allow increased stack"
+  err "sizes for this session."
+fi
+
 ## Info and backup warning
 heading "Info and Warning"
 warn "This script will analyze your repository and suggest commands to migrate"
@@ -306,9 +326,9 @@ if ! cmd git show $ROOT_OLD &>/dev/null; then
   stat "Old SHAs not present"
 else
   stat "Scanning tags"
-  old_tags="$(cmd git tag --contains $ROOT_OLD)"
+  old_tags="$(checkgit tag --contains $ROOT_OLD)"
   stat "Scanning branches"
-  rebase_branches=($(parse-git-branch git branch --contains $ROOT_OLD))
+  rebase_branches=($(parse-git-branch checkgit branch --contains $ROOT_OLD))
 fi
 
 if [ "${#rebase_branches[@]}" -gt 0 ]; then
@@ -586,9 +606,11 @@ else
   action "You have old tags that don't exist in the new SHAs. Verify that you"
   action "Don't want them, then delete them with the commands below"
   action "To list old tags that will be deleted:"
-  showcmd "git tag --contains $(hlc $ROOT_OLD)"
+  showcmd "( ulimit -s 16384 && git tag --contains $(hlc $ROOT_OLD) )"
   action "To delete them:"
-  showcmd "git tag -d \`git tag --contains $(hlc $ROOT_OLD)\`"
+  showcmd "( ulimit -s 16384 && git tag -d \`git tag --contains $(hlc $ROOT_OLD)\` )"
+  action "(the ulimit is to prevent a stack overflow bug when using git tag"
+  action " --contains on some systems)"
   action "NOTE: There are a *lot* fewer tags on the new remote, so it is normal"
   action "      for this to show >1000 tags needing deletion. (The new gecko-dev"
   action "      remote doesn't export the old CVS tags or tags from release"
