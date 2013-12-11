@@ -27,6 +27,13 @@ ROOT_NEW=3b56a9af51519d2e77e05efa672a13e6be2e9ebc
 ROOT_OLD=781c48087175615674b38b31fcc0aae17f0651b6
 ROOT_PROJECTS=fbf6b2c8fb285414ff412f2088b368efbf3172ed
 
+# Other old roots that are only on the old SHAs, only reachable from pre-Hg
+# branches or tags.
+ROOT_OLD_TAGS=(45eea0abd6da206106defee3daa7e3ac456ddb78
+               cc78336489123eec12f0f71bb157667ded54f6ae
+               a458d13f03d0ff94216a4632922791afe873d9eb
+               781c48087175615674b38b31fcc0aae17f0651b6)
+
 # These are two commits that match up from the two sets of shas, after which all
 # subsequent shas align when using |git rev-list --ancestry-path|. These are the
 # first Hg commits after CVS -- Before this, the history diverges due to
@@ -337,7 +344,13 @@ if ! cmd git show $ROOT_OLD &>/dev/null; then
 else
   stat "Scanning tags"
   if [ -z "$no_contains" ]; then
-    old_tags="$(checkgit tag --contains $ROOT_OLD)"
+    for root in $ROOT_OLD ${ROOT_OLD_TAGS[@]}; do
+      matching_tags="$(checkgit tag --contains $root)"
+      if [ -n "$matching_tags" ]; then
+        old_tags="$old_tags $matching_tags"
+        old_tags_roots="$old_roots $root"
+      fi
+    done
   else
     # Use slow dumb method of calling ls-remote and looping over tags comparing
     if ! known_tags=($(cmd git ls-remote -t $REMOTE_NEW && \
@@ -650,9 +663,15 @@ else
   action "Don't want them, then delete them with the commands below"
   if [ -z "$no_contains" ]; then
     action "To list old tags that will be deleted:"
-    showcmd "( ulimit -s 16384 && git tag --contains $(hlc $ROOT_OLD) )"
+    showcmd "ulimit -s 16384"
+    for root in ${old_tags_roots[@]}; do
+      showcmd "git tag --contains $(hlc $root)"
+    done
     action "To delete them:"
-    showcmd "( ulimit -s 16384 && git tag -d \`git tag --contains $(hlc $ROOT_OLD)\` )"
+    showcmd "ulimit -s 16384"
+    for root in ${old_tags_roots[@]}; do
+      showcmd "git tag -d \`git tag --contains $(hlc $root)\`"
+    done
     action "(the ulimit is to prevent a stack overflow bug when using git tag"
     action " --contains on some systems)"
   else
