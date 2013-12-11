@@ -351,7 +351,7 @@ else
       matching_tags="$(checkgit tag --contains $root)"
       if [ -n "$matching_tags" ]; then
         old_tags="$old_tags $matching_tags"
-        old_tags_roots="$old_roots $root"
+        old_tags_roots="$old_tags_roots $root"
       fi
     done
   else
