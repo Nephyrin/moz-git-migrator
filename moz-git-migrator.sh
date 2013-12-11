@@ -336,7 +336,7 @@ if ! cmd git show $ROOT_OLD &>/dev/null; then
   stat "Old SHAs not present"
 else
   stat "Scanning tags"
-  if [ -z "no_contains" ]; then
+  if [ -z "$no_contains" ]; then
     old_tags="$(checkgit tag --contains $ROOT_OLD)"
   else
     # Use slow dumb method of calling ls-remote and looping over tags comparing
