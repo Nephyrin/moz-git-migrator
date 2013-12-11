@@ -663,7 +663,7 @@ elif [ -z "$old_tags" ]; then
 else
   pad
   action "You have old tags that don't exist in the new SHAs. Verify that you"
-  action "Don't want them, then delete them with the commands below"
+  action "don't want them, then delete them with the commands below"
   if [ -z "$no_contains" ]; then
     action "To list old tags that will be deleted:"
     showcmd "ulimit -s 16384"
