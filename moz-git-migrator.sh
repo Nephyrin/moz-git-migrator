@@ -292,26 +292,35 @@ if [[ "${egitver[0]}" -lt 1 || "${egitver[1]}" -lt 8 ]]; then
   exit 1
 fi
 
+heading "Info and Warning"
+
 # Git hits a stack overflow when doing git tag --contains on our (massive) tree.
 # Happens 100% of the time with 4M stack, and in some configurations at 8M
-# stack, so try to set stack to 16M
-if ! ulimit -s 16384; then
-  err "Due to a bug in git, this script needs to run git with a 16M stack to"
-  err "avoid crashes, however, running |ulimit -s 16384| failed. If you"
-  err "encounter a git crash below, you will need to allow increased stack"
-  err "sizes for this session."
+# stack, so try to set stack to 16M. This will fail on windows, see:
+# https://groups.google.com/forum/#!topic/msysgit/FqT6boJrb2g/discussion
+stack_size="$(ulimit -s)"
+if [[ "$stack_size" -lt 16384 ]] && ! ulimit -s 16384 2>/dev/null; then
+  # Skipping this means we have to do something slightly dumber with tags, and
+  # slowly check merge-base for each branch
+  pad
+  warn "This system doesn't seem to support running git with an increased stack"
+  warn "limit (ulimit -s 16384) (This usually is due to msys/cygwin). Because of"
+  warn "a git bug, using --contains is impossible with your system's default"
+  warn "stack size (${stack_size}KiB). This script will use a (much) slower"
+  warn "method to analyze some refs."
+  pad
+  no_contains=1
 fi
 
 ## Info and backup warning
-heading "Info and Warning"
-warn "This script will analyze your repository and suggest commands to migrate"
-warn "to the new gecko-dev upstream. This script should not suggest any"
-warn "destructive or irreversible commands, but you should understand what they"
-warn "are doing before running any of them. Stop by #git if you would like"
-warn "further guidance or have any questions!"
-warn
-warn "If in doubt, it is not a bad idea to keep a backup of your repository"
-warn "before proceeding:"
+note "This script will analyze your repository and suggest commands to migrate"
+note "to the new gecko-dev upstream. This script should not suggest any"
+note "destructive or irreversible commands, but you should understand what they"
+note "are doing before running any of them. Stop by #git if you would like"
+note "further guidance or have any questions!"
+note
+note "If in doubt, it is not a bad idea to keep a backup of your repository"
+note "before proceeding:"
 showcmd "cp -a my-repo/.git my-repo-bak"
 pad
 
@@ -327,7 +336,34 @@ if ! cmd git show $ROOT_OLD &>/dev/null; then
   stat "Old SHAs not present"
 else
   stat "Scanning tags"
-  old_tags="$(checkgit tag --contains $ROOT_OLD)"
+  if [ -z "no_contains" ]; then
+    old_tags="$(checkgit tag --contains $ROOT_OLD)"
+  else
+    # Use slow dumb method of calling ls-remote and looping over tags comparing
+    if ! known_tags=($(cmd git ls-remote -t $REMOTE_NEW && \
+                       cmd git ls-remote -t $REMOTE_PROJECTS)); then
+      err "Failed to run |git ls-remote $REMOTE_NEW|. Because of the limitation"
+      err "on using --contains above, this is needed to determine if your tags"
+      err "are up to date. Please ensure you have a working net connection and"
+      die "try again."
+    fi
+    old_tags=""
+    for tag in $(cmd git tag); do
+      i=0
+      unset new_tag
+      while [ $i -lt "$((${#known_tags[@]} - 1))" ]; do
+        match=${known_tags[$(($i + 1))]}
+        hash=${known_tags[$i]}
+        if [ "${match#refs/tags/}" = "$tag" ] && \
+           [ "$(cmd git rev-parse $tag)" = "$hash" ]; then
+          new_tag=1
+          break;
+        fi
+        (( ++i ))
+      done
+      [ -n "$new_tag" ] || old_tags="$old_tags $tag"
+    done
+  fi
   stat "Scanning branches"
   rebase_branches=($(parse-git-branch checkgit branch --contains $ROOT_OLD))
 fi
@@ -612,12 +648,18 @@ else
   pad
   action "You have old tags that don't exist in the new SHAs. Verify that you"
   action "Don't want them, then delete them with the commands below"
-  action "To list old tags that will be deleted:"
-  showcmd "( ulimit -s 16384 && git tag --contains $(hlc $ROOT_OLD) )"
-  action "To delete them:"
-  showcmd "( ulimit -s 16384 && git tag -d \`git tag --contains $(hlc $ROOT_OLD)\` )"
-  action "(the ulimit is to prevent a stack overflow bug when using git tag"
-  action " --contains on some systems)"
+  if [ -z "$no_contains" ]; then
+    action "To list old tags that will be deleted:"
+    showcmd "( ulimit -s 16384 && git tag --contains $(hlc $ROOT_OLD) )"
+    action "To delete them:"
+    showcmd "( ulimit -s 16384 && git tag -d \`git tag --contains $(hlc $ROOT_OLD)\` )"
+    action "(the ulimit is to prevent a stack overflow bug when using git tag"
+    action " --contains on some systems)"
+  else
+    # This will spam a huge wall of tags, but the command to properly list these
+    # is messy without --contains
+    showcmd "git tag -d $old_tags"
+  fi
   action "NOTE: There are a *lot* fewer tags on the new remote, so it is normal"
   action "      for this to show >1000 tags needing deletion. (The new gecko-dev"
   action "      remote doesn't export the old CVS tags or tags from release"
