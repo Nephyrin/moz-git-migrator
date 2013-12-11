@@ -345,6 +345,9 @@ else
   stat "Scanning tags"
   if [ -z "$no_contains" ]; then
     for root in $ROOT_OLD ${ROOT_OLD_TAGS[@]}; do
+      if ! cmd git show $root &>/dev/null; then
+        continue
+      fi
       matching_tags="$(checkgit tag --contains $root)"
       if [ -n "$matching_tags" ]; then
         old_tags="$old_tags $matching_tags"
