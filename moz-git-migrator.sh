@@ -31,8 +31,7 @@ ROOT_PROJECTS=fbf6b2c8fb285414ff412f2088b368efbf3172ed
 # branches or tags.
 ROOT_OLD_TAGS=(45eea0abd6da206106defee3daa7e3ac456ddb78
                cc78336489123eec12f0f71bb157667ded54f6ae
-               a458d13f03d0ff94216a4632922791afe873d9eb
-               781c48087175615674b38b31fcc0aae17f0651b6)
+               a458d13f03d0ff94216a4632922791afe873d9eb)
 
 # These are two commits that match up from the two sets of shas, after which all
 # subsequent shas align when using |git rev-list --ancestry-path|. These are the
