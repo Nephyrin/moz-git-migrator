@@ -10,8 +10,8 @@ set -e
 REMOTE_NEW=https://github.com/mozilla/gecko-dev
 REMOTE_NEW_FAST=git://github.com/mozilla/gecko-dev
 # The old SHAs
-REMOTE_OLD=https://github.com/mozilla/mozilla-central
-REMOTE_OLD_FAST=git://github.com/mozilla/mozilla-central
+REMOTE_OLD=https://github.com/ehsan/mozilla-central
+REMOTE_OLD_FAST=git://github.com/ehsan/mozilla-central
 # The projects shas we're adding
 REMOTE_PROJECTS=https://github.com/mozilla/gecko-projects
 REMOTE_PROJECTS_FAST=git://github.com/mozilla/gecko-projects
